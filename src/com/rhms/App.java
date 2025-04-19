@@ -216,9 +216,28 @@ public class App {
             return;
         }
 
-        System.out.print("Enter Appointment Date (e.g., 2023-12-01): ");
-        String appointmentDateInput = scanner.nextLine();
-        Date appointmentDate = new Date(appointmentDateInput);
+        System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
+        Date appointmentDate = null;
+        while (appointmentDate == null) {
+            try {
+                String appointmentDateInput = scanner.nextLine();
+                if (!appointmentDateInput.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                    throw new IllegalArgumentException("Invalid date format. Please use yyyy-MM-dd");
+                }
+                appointmentDate = java.sql.Date.valueOf(appointmentDateInput);
+                
+                // Check if date is in the future
+                if (appointmentDate.before(new Date())) {
+                    System.out.println("Cannot schedule appointment in the past.");
+                    System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
+                    appointmentDate = null;
+                    continue;
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("Error: " + e.getMessage());
+                System.out.print("Please enter date in format yyyy-MM-dd (e.g., 2024-04-20): ");
+            }
+        }
 
         String appointmentDetails = "Appointment on " + appointmentDate.toString();
         patient.scheduleAppointment(appointmentDetails);
