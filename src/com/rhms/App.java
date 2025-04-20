@@ -8,6 +8,8 @@ import com.rhms.emergencyAlert.*;
 import com.rhms.notifications.ReminderService;
 import com.rhms.notifications.SMSNotification;
 import com.rhms.notifications.EmailNotification;
+import com.rhms.exceptions.RHMSException;
+import com.rhms.exceptions.ErrorHandler;
 
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -195,66 +197,51 @@ public class App {
     }
 
     private static void scheduleAppointment() {
-        if (patients.isEmpty() || doctors.isEmpty()) {
-            System.out.println("Error: Register at least one patient and one doctor first.");
-            return;
-        }
-
-        System.out.print("Enter Patient Name: ");
-        String patientName = scanner.nextLine();
-        Patient patient = findPatient(patientName);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
-        }
-
-        System.out.print("Enter Doctor Name: ");
-        String doctorName = scanner.nextLine();
-        Doctor doctor = findDoctor(doctorName);
-        if (doctor == null) {
-            System.out.println("Doctor not found!");
-            return;
-        }
-
-        System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
-        Date appointmentDate = null;
-        while (appointmentDate == null) {
-            try {
-                String appointmentDateInput = scanner.nextLine();
-                if (!appointmentDateInput.matches("\\d{4}-\\d{2}-\\d{2}")) {
-                    throw new IllegalArgumentException("Invalid date format. Please use yyyy-MM-dd");
-                }
-                appointmentDate = java.sql.Date.valueOf(appointmentDateInput);
-                
-                // Check if date is in the future
-                if (appointmentDate.before(new Date())) {
-                    System.out.println("Cannot schedule appointment in the past.");
-                    System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
-                    appointmentDate = null;
-                    continue;
-                }
-            } catch (IllegalArgumentException e) {
-                System.out.println("Error: " + e.getMessage());
-                System.out.print("Please enter date in format yyyy-MM-dd (e.g., 2024-04-20): ");
+        try {
+            System.out.print("Enter Patient Name: ");
+            String patientName = scanner.nextLine();
+            Patient patient = findPatient(patientName);
+            if (patient == null) {
+                throw new RHMSException(
+                    RHMSException.ErrorCode.PATIENT_NOT_FOUND,
+                    "Patient not found: " + patientName
+                );
             }
+
+            System.out.print("Enter Doctor Name: ");
+            String doctorName = scanner.nextLine();
+            Doctor doctor = findDoctor(doctorName);
+            if (doctor == null) {
+                throw new RHMSException(
+                    RHMSException.ErrorCode.DOCTOR_NOT_FOUND,
+                    "Doctor not found: " + doctorName
+                );
+            }
+
+            System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
+            String dateStr = scanner.nextLine();
+            ErrorHandler.validateAppointmentDate(dateStr);
+            Date appointmentDate = java.sql.Date.valueOf(dateStr);
+
+            String appointmentDetails = "Appointment on " + appointmentDate.toString();
+            patient.scheduleAppointment(appointmentDetails);
+            doctor.manageAppointment(appointmentDetails);
+
+            Appointment appointment = new Appointment(appointmentDate, doctor, patient, "Pending");
+            appointmentManager.getAppointments().add(appointment);
+
+            // Send confirmation notifications
+            String subject = "Appointment Confirmation";
+            String message = String.format("Your appointment with Dr. %s is scheduled for %s", 
+                doctor.getName(), appointmentDate.toString());
+            
+            emailNotification.sendNotification(patient.getEmail(), subject, message);
+            smsNotification.sendNotification(patient.getPhone(), subject, message);
+            
+            System.out.println("Appointment scheduled successfully!");
+        } catch (RHMSException e) {
+            ErrorHandler.handleException(e);
         }
-
-        String appointmentDetails = "Appointment on " + appointmentDate.toString();
-        patient.scheduleAppointment(appointmentDetails);
-        doctor.manageAppointment(appointmentDetails);
-
-        Appointment appointment = new Appointment(appointmentDate, doctor, patient, "Pending");
-        appointmentManager.getAppointments().add(appointment);
-
-        // Send confirmation notifications
-        String subject = "Appointment Confirmation";
-        String message = String.format("Your appointment with Dr. %s is scheduled for %s", 
-            doctor.getName(), appointmentDate.toString());
-        
-        emailNotification.sendNotification(patient.getEmail(), subject, message);
-        smsNotification.sendNotification(patient.getPhone(), subject, message);
-        
-        System.out.println("Appointment scheduled successfully!");
     }
 
     private static void approveAppointment() {

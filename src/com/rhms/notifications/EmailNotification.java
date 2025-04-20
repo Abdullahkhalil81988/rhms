@@ -7,8 +7,8 @@ import java.util.Properties;
 // Handles email notifications using Gmail SMTP server
 public class EmailNotification implements Notifiable {
     // Gmail credentials for sending emails
-    private final String senderEmail = "abdullahkhalil8198@gmail.com"; // Your Gmail
-    private final String senderPassword = "visk zzic wbmm ewgz"; // Your Gmail App Password
+    private final String senderEmail = "abdullahkhalil8198@gmail.com"; //  Gmail
+    private final String senderPassword = "visk zzic wbmm ewgz"; //  Gmail App Password
 
     // Sends an email notification to the specified recipient
     @Override

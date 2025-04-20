@@ -24,6 +24,9 @@ public class VitalSign {
      * @throws IllegalArgumentException if any vital sign is out of normal range
      */
     public VitalSign(double heartRate, double oxygenLevel, double bloodPressure, double temperature) {
+        if (heartRate < 0 || oxygenLevel < 0 || bloodPressure < 0 || temperature < 0) {
+            throw new IllegalArgumentException("Vital signs cannot be negative");
+        }
         validateHeartRate(heartRate);
         validateOxygenLevel(oxygenLevel);
         validateBloodPressure(bloodPressure);
