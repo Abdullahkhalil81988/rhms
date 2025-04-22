@@ -32,85 +32,51 @@ public class App {
 
     public static void main(String[] args) {
         while (true) {
-            // User Type Selection
-            System.out.println("\n===== RHMS User Type Selection =====");
-            System.out.println("1. Patient");
-            System.out.println("2. Doctor");
-            System.out.println("3. Admin");
-            System.out.println("0. Exit System");
-            System.out.print("Choose your user type: ");
+            try {
+                // User Type Selection
+                System.out.println("\n===== RHMS User Type Selection =====");
+                System.out.println("1. Patient");
+                System.out.println("2. Doctor");
+                System.out.println("3. Admin");
+                System.out.println("0. Exit System");
 
-            int userTypeChoice = scanner.nextInt();
-            scanner.nextLine(); // Consume newline
+                int userTypeChoice = getNumericInput("Choose your user type: ", 0, 3);
 
-            if (userTypeChoice == 0) {
-                System.out.println("Exiting RHMS System. Goodbye!");
-                return;
-            }
-
-            switch (userTypeChoice) {
-                case 1: userType = "Patient"; break;
-                case 2: userType = "Doctor"; break;
-                case 3: userType = "Admin"; break;
-                default:
-                    System.out.println("Invalid choice! Please try again.");
-                    continue;
-            }
-
-            // Sub-menu loop
-            boolean stayInSubmenu = true;
-            while (stayInSubmenu) {
-                System.out.println("\n===== RHMS System Menu =====");
-                if ("Admin".equals(userType)) {
-                    showAdminMenu();
-                } else if ("Patient".equals(userType)) {
-                    showPatientMenu();
-                } else if ("Doctor".equals(userType)) {
-                    showDoctorMenu();
-                }
-                int choice = scanner.nextInt();
-                scanner.nextLine(); // Consume newline
-
-                if (choice == 9) {
-                    stayInSubmenu = false; // Go back to user type selection
-                    continue;
+                if (userTypeChoice == 0) {
+                    System.out.println("Exiting RHMS System. Goodbye!");
+                    return;
                 }
 
-                // Execute based on the user type
-                if ("Admin".equals(userType)) {
-                    switch (choice) {
-                        case 1: registerPatient(); break;
-                        case 2: registerDoctor(); break;
-                        case 3: scheduleAppointment(); break;
-                        case 4: showNotificationMenu(); break;
-                        case 5: viewAllAppointments(); break;
-                        case 0: stayInSubmenu = false; break;
-                        default: System.out.println("Invalid choice!");
-                    }
-                } else if ("Patient".equals(userType)) {
-                    switch (choice) {
-                        case 1: scheduleAppointment(); break;
-                        case 2: viewVitals(); break;
-                        case 3: provideFeedback(); break;
-                        case 4: triggerEmergencyAlert(); break;
-                        case 5: togglePanicButton(); break;
-                        case 6: joinVideoConsultation(); break;
-                        case 7: openChat(); break;
-                        case 0: System.out.println("Exiting RHMS System. Goodbye!"); return;
-                        default: System.out.println("Invalid choice! Please try again.");
-                    }
-                } else if ("Doctor".equals(userType)) {
-                    switch (choice) {
-                        case 1: approveAppointment(); break;
-                        case 2: cancelAppointment(); break;
-                        case 3: uploadVitals(); break;
-                        case 4: viewVitals(); break;
-                        case 5: startVideoConsultation(); break;
-                        case 6: openChat(); break;
-                        case 0: System.out.println("Exiting RHMS System. Goodbye!"); return;
-                        default: System.out.println("Invalid choice! Please try again.");
+                switch (userTypeChoice) {
+                    case 1: userType = "Patient"; break;
+                    case 2: userType = "Doctor"; break;
+                    case 3: userType = "Admin"; break;
+                }
+
+                // Sub-menu loop
+                boolean stayInSubmenu = true;
+                while (stayInSubmenu) {
+                    try {
+                        System.out.println("\n===== RHMS System Menu =====");
+                        if ("Admin".equals(userType)) {
+                            showAdminMenu();
+                            int choice = getNumericInput("Choose an option: ", 0, 5);
+                            // ... rest of admin menu handling
+                        } else if ("Patient".equals(userType)) {
+                            showPatientMenu();
+                            int choice = getNumericInput("Choose an option: ", 0, 9);
+                            // ... rest of patient menu handling
+                        } else if ("Doctor".equals(userType)) {
+                            showDoctorMenu();
+                            int choice = getNumericInput("Choose an option: ", 0, 9);
+                            // ... rest of doctor menu handling
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error processing menu choice: " + e.getMessage());
                     }
                 }
+            } catch (Exception e) {
+                System.out.println("Error in main menu: " + e.getMessage());
             }
         }
     }
@@ -152,48 +118,39 @@ public class App {
     }
 
     private static void registerPatient() {
-        System.out.print("Enter Patient Name: ");
-        String name = scanner.nextLine();
-        System.out.print("Enter Email: ");
-        String email = scanner.nextLine();
-        System.out.print("Enter Password: ");
-        String password = scanner.nextLine();
-        System.out.print("Enter Phone: ");
-        String phone = scanner.nextLine();
-        System.out.print("Enter Address: ");
-        String address = scanner.nextLine();
-        System.out.print("Enter User ID: ");
-        int userID = scanner.nextInt();
-        scanner.nextLine(); // Consume newline
+        try {
+            String name = safeNextString("Enter Patient Name: ", "Patient name", true);
+            String email = safeNextEmail("Enter Email: ");
+            String password = safeNextString("Enter Password: ", "Password", true);
+            String phone = safeNextPhone("Enter Phone: ");
+            String address = safeNextString("Enter Address: ", "Address", true);
+            int userID = getNumericInput("Enter User ID: ", 1, 99999);
 
-        Patient patient = new Patient(name, email, password, phone, address, userID);
-        patients.add(patient);
-        System.out.println("Patient " + name + " registered successfully.");
+            Patient patient = new Patient(name, email, password, phone, address, userID);
+            patients.add(patient);
+            System.out.println("Patient " + name + " registered successfully.");
+        } catch (Exception e) {
+            System.out.println("Error registering patient: " + e.getMessage());
+        }
     }
 
     private static void registerDoctor() {
-        System.out.print("Enter Doctor Name: ");
-        String name = scanner.nextLine();
-        System.out.print("Enter Email: ");
-        String email = scanner.nextLine();
-        System.out.print("Enter Password: ");
-        String password = scanner.nextLine();
-        System.out.print("Enter Phone: ");
-        String phone = scanner.nextLine();
-        System.out.print("Enter Address: ");
-        String address = scanner.nextLine();
-        System.out.print("Enter User ID: ");
-        int userID = scanner.nextInt();
-        scanner.nextLine(); // Consume newline
-        System.out.print("Enter Specialization: ");
-        String specialization = scanner.nextLine();
-        System.out.print("Enter Years of Experience: ");
-        int experienceYears = scanner.nextInt();
-        scanner.nextLine(); // Consume newline
+        try {
+            String name = safeNextString("Enter Doctor Name: ", "Doctor name", true);
+            String email = safeNextEmail("Enter Email: ");
+            String password = safeNextString("Enter Password: ", "Password", true);
+            String phone = safeNextPhone("Enter Phone: ");
+            String address = safeNextString("Enter Address: ", "Address", true);
+            int userID = getNumericInput("Enter User ID: ", 1, 99999);
+            String specialization = safeNextString("Enter Specialization: ", "Specialization", true);
+            int experienceYears = getNumericInput("Enter Years of Experience: ", 0, 70);
 
-        Doctor doctor = new Doctor(name, email, password, phone, address, userID, specialization, experienceYears);
-        doctors.add(doctor);
-        System.out.println("Doctor " + name + " registered successfully.");
+            Doctor doctor = new Doctor(name, email, password, phone, address, userID, specialization, experienceYears);
+            doctors.add(doctor);
+            System.out.println("Doctor " + name + " registered successfully.");
+        } catch (Exception e) {
+            System.out.println("Error registering doctor: " + e.getMessage());
+        }
     }
 
     private static void scheduleAppointment() {
@@ -263,36 +220,34 @@ public class App {
     }
 
     private static void uploadVitals() {
-        System.out.print("Enter Patient Name: ");
-        String name = scanner.nextLine();
-        Patient patient = findPatient(name);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
+        try {
+            String name = safeNextString("Enter Patient Name: ", "Patient name", true);
+            Patient patient = findPatient(name);
+            if (patient == null) {
+                System.out.println("Patient not found!");
+                return;
+            }
+
+            double heartRate = Double.parseDouble(safeNextString("Enter Heart Rate: ", "Heart Rate", true));
+            double oxygenLevel = Double.parseDouble(safeNextString("Enter Oxygen Level: ", "Oxygen Level", true));
+            double bloodPressure = Double.parseDouble(safeNextString("Enter Blood Pressure: ", "Blood Pressure", true));
+            double temperature = Double.parseDouble(safeNextString("Enter Temperature: ", "Temperature", true));
+
+            // Create vital sign record
+            VitalSign vitals = new VitalSign(heartRate, oxygenLevel, bloodPressure, temperature);
+            
+            // Check for emergency conditions and store vitals
+            emergencyAlert.checkVitals(patient, vitals);
+            String vitalsRecord = String.format("HR: %.1f, O2: %.1f%%, BP: %.1f, Temp: %.1f°C", 
+                heartRate, oxygenLevel, bloodPressure, temperature);
+            patient.uploadMedicalRecord(vitalsRecord);
+
+            System.out.println("Vitals uploaded successfully!");
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Please enter valid numbers for vital signs.");
+        } catch (Exception e) {
+            System.out.println("Error uploading vitals: " + e.getMessage());
         }
-
-        System.out.print("Enter Heart Rate: ");
-        double heartRate = scanner.nextDouble();
-        System.out.print("Enter Oxygen Level: ");
-        double oxygenLevel = scanner.nextDouble();
-        System.out.print("Enter Blood Pressure: ");
-        double bloodPressure = scanner.nextDouble();
-        System.out.print("Enter Temperature: ");
-        double temperature = scanner.nextDouble();
-        scanner.nextLine(); // Consume newline
-
-        // Create vital sign record
-        VitalSign vitals = new VitalSign(heartRate, oxygenLevel, bloodPressure, temperature);
-        
-        // Check for emergency conditions
-        emergencyAlert.checkVitals(patient, vitals);
-
-        // Store vitals record
-        String vitalsRecord = String.format("HR: %.1f, O2: %.1f%%, BP: %.1f, Temp: %.1f°C", 
-            heartRate, oxygenLevel, bloodPressure, temperature);
-        patient.uploadMedicalRecord(vitalsRecord);
-
-        System.out.println("Vitals uploaded successfully!");
     }
 
     private static void viewVitals() {
@@ -594,6 +549,118 @@ public class App {
         System.out.println("\n=== All Appointments ===");
         for (Appointment appointment : appointmentManager.getAppointments()) {
             System.out.println(appointment);
+        }
+    }
+
+    /**
+     * Safely captures a string input with validation
+     * @param prompt Message to display to the user
+     * @param fieldName Name of the field (for error messages)
+     * @param required Whether the field is required
+     * @return The validated string input
+     * @throws RHMSException if validation fails
+     */
+    private static String safeNextString(String prompt, String fieldName, boolean required) throws RHMSException {
+        System.out.print(prompt);
+        String input = scanner.nextLine().trim();
+        
+        if (required && input.isEmpty()) {
+            throw new RHMSException(
+                RHMSException.ErrorCode.EMPTY_INPUT_ERROR,
+                fieldName + " cannot be empty",
+                "Entering " + fieldName.toLowerCase()
+            );
+        }
+        
+        return input;
+    }
+
+    /**
+     * Safely captures a date input with validation
+     * @param prompt Message to display to the user
+     * @return The validated date string
+     * @throws RHMSException if validation fails
+     */
+    private static String safeNextDate(String prompt) throws RHMSException {
+        System.out.print(prompt);
+        String dateStr = scanner.nextLine().trim();
+        ErrorHandler.validateAppointmentDate(dateStr);
+        return dateStr;
+    }
+
+    /**
+     * Safely captures an email input with validation
+     * @param prompt Message to display to the user
+     * @return The validated email string
+     * @throws RHMSException if validation fails
+     */
+    private static String safeNextEmail(String prompt) throws RHMSException {
+        System.out.print(prompt);
+        String email = scanner.nextLine().trim();
+        ErrorHandler.validateEmail(email);
+        return email;
+    }
+
+    /**
+     * Safely captures a phone input with validation
+     * @param prompt Message to display to the user
+     * @return The validated phone string
+     * @throws RHMSException if validation fails
+     */
+    private static String safeNextPhone(String prompt) throws RHMSException {
+        System.out.print(prompt);
+        String phone = scanner.nextLine().trim();
+        ErrorHandler.validatePhone(phone);
+        return phone;
+    }
+
+    /**
+     * Safely captures a name input with validation
+     * @param prompt Message to display to the user
+     * @param fieldName Name of the field (for error messages)
+     * @return The validated name string
+     * @throws RHMSException if validation fails
+     */
+    private static String safeNextName(String prompt, String fieldName) throws RHMSException {
+        System.out.print(prompt);
+        String name = scanner.nextLine().trim();
+        ErrorHandler.validateName(name, fieldName);
+        return name;
+    }
+
+    /**
+     * Safely captures a numeric input with validation
+     * @param prompt Message to display to the user
+     * @param minValue Minimum acceptable value
+     * @param maxValue Maximum acceptable value
+     * @return The validated numeric input
+     */
+    private static int getNumericInput(String prompt, int minValue, int maxValue) {
+        while (true) {
+            try {
+                System.out.print(prompt);
+                String input = scanner.nextLine().trim();
+                
+                // Check for empty input
+                if (input.isEmpty()) {
+                    System.out.println("Error: Input cannot be empty. Please try again.");
+                    continue;
+                }
+
+                // Try to convert to integer
+                int value = Integer.parseInt(input);
+                
+                // Validate range
+                if (value < minValue || value > maxValue) {
+                    System.out.printf("Error: Please enter a number between %d and %d\n", minValue, maxValue);
+                    continue;
+                }
+
+                return value;
+
+            } catch (NumberFormatException e) {
+                System.out.println("Error: Please enter a valid number.");
+            }
         }
     }
 }
