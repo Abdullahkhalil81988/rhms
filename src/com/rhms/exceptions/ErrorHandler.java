@@ -196,23 +196,23 @@ public class ErrorHandler {
     
     /**
      * Validates phone number format
-     * @throws RHMSException if phone number format is invalid
+     * @throws RHMSException if phone number is empty
      */
     public static void validatePhone(String phone) throws RHMSException {
         if (phone == null || phone.trim().isEmpty()) {
             throw new RHMSException(
                 RHMSException.ErrorCode.EMPTY_INPUT_ERROR,
                 "Phone number cannot be empty",
-                "Entering phone number"
+                "Validating phone number"
             );
         }
-        
-        // Common phone formats: xxx-xxx-xxxx, (xxx) xxx-xxxx, xxxxxxxxxx
-        if (!phone.matches("\\d{10}|\\d{3}[-\\s]\\d{3}[-\\s]\\d{4}|\\(\\d{3}\\)\\s*\\d{3}[-\\s]\\d{4}")) {
+
+        // Only check if it contains digits
+        if (!phone.matches(".*\\d+.*")) {
             throw new RHMSException(
-                RHMSException.ErrorCode.INVALID_INPUT,
-                "Invalid phone number format: " + phone,
-                "Entering phone number"
+                RHMSException.ErrorCode.TEXT_INPUT_ERROR,
+                "Phone number must contain digits",
+                "Validating phone number"
             );
         }
     }

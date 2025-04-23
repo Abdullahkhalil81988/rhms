@@ -17,7 +17,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-public class App {
+public class TESTAPP {
     private static ArrayList<Patient> patients = new ArrayList<>();
     private static ArrayList<Doctor> doctors = new ArrayList<>();
     private static AppointmentManager appointmentManager = new AppointmentManager();
@@ -31,7 +31,8 @@ public class App {
     private static EmailNotification emailNotification = new EmailNotification();
 
     public static void main(String[] args) {
-        while (true) {
+        boolean running = true;
+        while (running) {
             try {
                 // User Type Selection
                 System.out.println("\n===== RHMS User Type Selection =====");
@@ -39,45 +40,149 @@ public class App {
                 System.out.println("2. Doctor");
                 System.out.println("3. Admin");
                 System.out.println("0. Exit System");
+                System.out.print("Choose your user type: ");
 
-                int userTypeChoice = getNumericInput("Choose your user type: ", 0, 3);
+                int userTypeChoice = safeNextInt(null);
 
                 if (userTypeChoice == 0) {
                     System.out.println("Exiting RHMS System. Goodbye!");
-                    return;
+                    running = false;
+                    continue;
                 }
 
                 switch (userTypeChoice) {
                     case 1: userType = "Patient"; break;
                     case 2: userType = "Doctor"; break;
                     case 3: userType = "Admin"; break;
+                    default:
+                        throw new RHMSException(
+                            RHMSException.ErrorCode.INVALID_INPUT,
+                            "Invalid user type selection: " + userTypeChoice + ". Please choose options 0-3.",
+                            "User type selection"
+                        );
                 }
 
                 // Sub-menu loop
                 boolean stayInSubmenu = true;
-                while (stayInSubmenu) {
+                while (stayInSubmenu && running) {
                     try {
-                        System.out.println("\n===== RHMS System Menu =====");
                         if ("Admin".equals(userType)) {
                             showAdminMenu();
-                            int choice = getNumericInput("Choose an option: ", 0, 5);
-                            // ... rest of admin menu handling
+                            int choice = safeNextInt("Choose an option: ");
+                            stayInSubmenu = handleAdminMenu(choice);
                         } else if ("Patient".equals(userType)) {
                             showPatientMenu();
-                            int choice = getNumericInput("Choose an option: ", 0, 9);
-                            // ... rest of patient menu handling
+                            int choice = safeNextInt("Choose an option: ");
+                            if (!handlePatientMenu(choice)) {
+                                running = false;
+                                break;
+                            }
+                            stayInSubmenu = (choice != 9 && choice != 0);
                         } else if ("Doctor".equals(userType)) {
                             showDoctorMenu();
-                            int choice = getNumericInput("Choose an option: ", 0, 9);
-                            // ... rest of doctor menu handling
+                            int choice = safeNextInt("Choose an option: ");
+                            if (!handleDoctorMenu(choice)) {
+                                running = false;
+                                break;
+                            }
+                            stayInSubmenu = (choice != 9 && choice != 0);
                         }
+                    } catch (RHMSException e) {
+                        ErrorHandler.handleException(e);
                     } catch (Exception e) {
-                        System.out.println("Error processing menu choice: " + e.getMessage());
+                        ErrorHandler.handleGeneralException(e);
                     }
                 }
+            } catch (RHMSException e) {
+                ErrorHandler.handleException(e);
             } catch (Exception e) {
-                System.out.println("Error in main menu: " + e.getMessage());
+                ErrorHandler.handleGeneralException(e);
             }
+        }
+        scanner.close();
+    }
+
+    private static boolean handleAdminMenu(int choice) throws RHMSException {
+        switch (choice) {
+            case 1: registerPatient(); break;
+            case 2: registerDoctor(); break;
+            case 3: scheduleAppointment(); break;
+            case 4: showNotificationMenu(); break;
+            case 5: viewAllAppointments(); break;
+            case 0: return false;
+            default:
+                throw new RHMSException(
+                    RHMSException.ErrorCode.INVALID_INPUT,
+                    "Invalid admin menu option: " + choice + ". Please select options 0-5.",
+                    "Admin menu selection"
+                );
+        }
+        return true;
+    }
+
+    private static boolean handlePatientMenu(int choice) throws RHMSException {
+        switch (choice) {
+            case 1: scheduleAppointment(); break;
+            case 2: viewVitals(); break;
+            case 3: provideFeedback(); break;
+            case 4: triggerEmergencyAlert(); break;
+            case 5: togglePanicButton(); break;
+            case 6: joinVideoConsultation(); break;
+            case 7: openChat(); break;
+            case 9: return true;  // Return to user type selection
+            case 0: return false; // Exit system
+            default:
+                throw new RHMSException(
+                    RHMSException.ErrorCode.INVALID_INPUT,
+                    "Invalid patient menu option: " + choice + ". Please select options 0-7 or 9.",
+                    "Patient menu selection"
+                );
+        }
+        return true;
+    }
+
+    private static boolean handleDoctorMenu(int choice) throws RHMSException {
+        switch (choice) {
+            case 1: approveAppointment(); break;
+            case 2: cancelAppointment(); break;
+            case 3: uploadVitals(); break;
+            case 4: viewVitals(); break;
+            case 5: startVideoConsultation(); break;
+            case 6: openChat(); break;
+            case 9: return true;  // Return to user type selection
+            case 0: return false; // Exit system
+            default:
+                throw new RHMSException(
+                    RHMSException.ErrorCode.INVALID_INPUT,
+                    "Invalid doctor menu option: " + choice + ". Please select options 0-6 or 9.",
+                    "Doctor menu selection"
+                );
+        }
+        return true;
+    }
+
+    private static int safeNextInt(String prompt) throws RHMSException {
+        try {
+            if (prompt != null) {
+                System.out.print(prompt);
+            }
+            String input = scanner.nextLine().trim();
+            
+            if (input.isEmpty()) {
+                throw new RHMSException(
+                    RHMSException.ErrorCode.EMPTY_INPUT_ERROR,
+                    "Input cannot be empty",
+                    "Reading numeric input"
+                );
+            }
+
+            return Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            throw new RHMSException(
+                RHMSException.ErrorCode.NUMERIC_INPUT_ERROR,
+                "Invalid number format. Please enter a valid number.",
+                "Reading numeric input"
+            );
         }
     }
 
@@ -89,7 +194,6 @@ public class App {
         System.out.println("4. Send Notifications");
         System.out.println("5. View All Appointments");
         System.out.println("0. Back to User Selection");
-        System.out.print("Choose an option: ");
     }
 
     private static void showPatientMenu() {
