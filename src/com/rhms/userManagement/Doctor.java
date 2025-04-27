@@ -25,4 +25,8 @@ public class Doctor extends User {
     public void manageAppointment(String appointmentDetails) {
         System.out.println("Managing appointment: " + appointmentDetails);
     }
+
+    public String getSpecialization() {
+        return specialization;
+    }
 }

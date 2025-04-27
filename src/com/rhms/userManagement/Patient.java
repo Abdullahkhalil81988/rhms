@@ -1,14 +1,18 @@
 package com.rhms.userManagement;
 
 import java.util.ArrayList;
-import com.rhms.emergencyAlert.PanicButton; // Make sure this import exists
+import com.rhms.emergencyAlert.PanicButton; // Import for panic button
+import com.rhms.healthDataHandling.VitalsDatabase; // Import for vitals database
+import com.rhms.doctorPatientInteraction.MedicalHistory; // Corrected import for medical history
 
 public class Patient extends User {
     private ArrayList<String> medicalRecords;
     private ArrayList<String> doctorFeedback;
     private ArrayList<String> appointments;
     private PanicButton panicButton;
-
+    private VitalsDatabase vitalsDatabase;
+    private MedicalHistory medicalHistory;
+    
     public Patient(String name, String email, String password, String phone, String address, int userID) {
         super(name, email, password, phone, address, userID);
         this.medicalRecords = new ArrayList<>();
@@ -49,6 +53,24 @@ public class Patient extends User {
 
     public PanicButton getPanicButton() {
         return panicButton;
+    }
+    
+    // Getter and setter for vitals database
+    public VitalsDatabase getVitalsDatabase() {
+        return vitalsDatabase;
+    }
+    public void setVitalsDatabase(VitalsDatabase vitalsDatabase) {
+        this.vitalsDatabase = vitalsDatabase;
+    }
+    
+    // Getter and setter for medical history
+    // Getter and setter for medical history
+    public MedicalHistory getMedicalHistory() {
+        return medicalHistory;
+    }
+    
+    public void setMedicalHistory(MedicalHistory medicalHistory) {
+        this.medicalHistory = medicalHistory;
     }
 }
 

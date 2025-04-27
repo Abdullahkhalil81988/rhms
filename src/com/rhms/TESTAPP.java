@@ -10,87 +10,74 @@ import com.rhms.notifications.SMSNotification;
 import com.rhms.notifications.EmailNotification;
 import com.rhms.exceptions.RHMSException;
 import com.rhms.exceptions.ErrorHandler;
+import com.rhms.analytics.HealthAnalytics;
+import com.rhms.analytics.AnalyticsResult;
+import com.rhms.analytics.HealthDataVisualizer;
+import com.rhms.reporting.ReportsGenerator;
 
 import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class TESTAPP {
     private static ArrayList<Patient> patients = new ArrayList<>();
     private static ArrayList<Doctor> doctors = new ArrayList<>();
+    private static ArrayList<Administrator> administrators = new ArrayList<>();  // Added administrators list
     private static AppointmentManager appointmentManager = new AppointmentManager();
     private static EmergencyAlert emergencyAlert = new EmergencyAlert();
     private static Scanner scanner = new Scanner(System.in);
     private static String userType = ""; // Store user type
+    private static User currentUser = null; // Track logged in user
+    private static boolean isLoggedIn = false; // Track login status
     private static ChatServer chatServer = new ChatServer();
-    private static Map<String, ChatClient> chatClients = new HashMap<>();
-    private static ReminderService reminderService = new ReminderService();
     private static SMSNotification smsNotification = new SMSNotification();
-    private static EmailNotification emailNotification = new EmailNotification();
+    // Remove unused fields
+    // private static ReminderService reminderService;
+    // private static EmailNotification emailNotification;
 
     public static void main(String[] args) {
+        // Initialize demo data
+        initializeDemoData();
+        
         boolean running = true;
         while (running) {
             try {
-                // User Type Selection
-                System.out.println("\n===== RHMS User Type Selection =====");
-                System.out.println("1. Patient");
-                System.out.println("2. Doctor");
-                System.out.println("3. Admin");
-                System.out.println("0. Exit System");
-                System.out.print("Choose your user type: ");
-
-                int userTypeChoice = safeNextInt(null);
-
-                if (userTypeChoice == 0) {
-                    System.out.println("Exiting RHMS System. Goodbye!");
-                    running = false;
-                    continue;
-                }
-
-                switch (userTypeChoice) {
-                    case 1: userType = "Patient"; break;
-                    case 2: userType = "Doctor"; break;
-                    case 3: userType = "Admin"; break;
-                    default:
-                        throw new RHMSException(
-                            RHMSException.ErrorCode.INVALID_INPUT,
-                            "Invalid user type selection: " + userTypeChoice + ". Please choose options 0-3.",
-                            "User type selection"
-                        );
-                }
-
-                // Sub-menu loop
-                boolean stayInSubmenu = true;
-                while (stayInSubmenu && running) {
-                    try {
-                        if ("Admin".equals(userType)) {
-                            showAdminMenu();
-                            int choice = safeNextInt("Choose an option: ");
-                            stayInSubmenu = handleAdminMenu(choice);
-                        } else if ("Patient".equals(userType)) {
-                            showPatientMenu();
-                            int choice = safeNextInt("Choose an option: ");
-                            if (!handlePatientMenu(choice)) {
-                                running = false;
-                                break;
-                            }
-                            stayInSubmenu = (choice != 9 && choice != 0);
-                        } else if ("Doctor".equals(userType)) {
-                            showDoctorMenu();
-                            int choice = safeNextInt("Choose an option: ");
-                            if (!handleDoctorMenu(choice)) {
-                                running = false;
-                                break;
-                            }
-                            stayInSubmenu = (choice != 9 && choice != 0);
-                        }
-                    } catch (RHMSException e) {
-                        ErrorHandler.handleException(e);
-                    } catch (Exception e) {
-                        ErrorHandler.handleGeneralException(e);
+                // Show login screen when not logged in
+                if (!isLoggedIn) {
+                    showLoginMenu();
+                    int choice = Integer.parseInt(scanner.nextLine().trim());
+                    
+                    switch (choice) {
+                        case 1:
+                            performLogin();
+                            break;
+                        case 2:
+                            // Registration handled in admin menu now
+                            System.out.println("Registration must be done through an administrator.");
+                            break;
+                        case 0:
+                            System.out.println("Exiting RHMS System. Goodbye!");
+                            running = false;
+                            break;
+                        default:
+                            throw new RHMSException(
+                                RHMSException.ErrorCode.INVALID_INPUT,
+                                "Invalid menu option: " + choice + ". Please choose options 0-2.",
+                                "Login menu selection"
+                            );
+                    }
+                } else {
+                    // Show role-specific dashboard based on user type
+                    if ("Admin".equals(userType)) {
+                        showAdminDashboard();
+                    } else if ("Patient".equals(userType)) {
+                        showPatientDashboard();
+                    } else if ("Doctor".equals(userType)) {
+                        showDoctorDashboard();
                     }
                 }
             } catch (RHMSException e) {
@@ -102,669 +89,1388 @@ public class TESTAPP {
         scanner.close();
     }
 
-    private static boolean handleAdminMenu(int choice) throws RHMSException {
+    // Initialize demo users for testing
+    private static void initializeDemoData() {
+        // Add demo admin
+        Administrator admin = new Administrator("Admin User", "admin@hospital.com", "admin123", 
+                                              "123456789", "Hospital HQ", 1001);
+        administrators.add(admin);
+        
+        // Add demo doctor with updated name: Abdullah
+        Doctor doctor = new Doctor("Dr. Abdullah", "abdullah@hospital.com", "doctor123", 
+                                  "987654321", "Medical Center", 2001, "Cardiology", 10);
+        doctors.add(doctor);
+        
+        // Add demo patient with updated name: Ali
+        Patient patient = new Patient("Ali", "ali@example.com", "patient123", 
+                                     "555123456", "123 Main St", 3001);
+        patients.add(patient);
+        
+        System.out.println("Demo accounts created:");
+        System.out.println("Admin - Email: admin@hospital.com, Password: admin123");
+        System.out.println("Doctor - Email: abdullah@hospital.com, Password: doctor123");
+        System.out.println("Patient - Email: ali@example.com, Password: patient123");
+    }
+    
+    // Display login menu
+    private static void showLoginMenu() {
+        System.out.println("\n===== RHMS Login =====");
+        System.out.println("1. Login");
+        System.out.println("2. Request Registration");
+        System.out.println("0. Exit System");
+        System.out.print("Choose an option: ");
+    }
+    
+    // Handle user login process
+    private static void performLogin() throws RHMSException {
+        System.out.print("Enter Email: ");
+        String email = scanner.nextLine().trim();
+        System.out.print("Enter Password: ");
+        String password = scanner.nextLine().trim();
+        
+        // Try to authenticate as administrator
+        for (Administrator admin : administrators) {
+            if (admin.getEmail().equalsIgnoreCase(email) && admin.getPassword().equals(password)) {
+                currentUser = admin;
+                userType = "Admin";
+                isLoggedIn = true;
+                System.out.println("Welcome, Administrator " + admin.getName());
+                return;
+            }
+        }
+        
+        // Try to authenticate as doctor
+        for (Doctor doctor : doctors) {
+            if (doctor.getEmail().equalsIgnoreCase(email) && doctor.getPassword().equals(password)) {
+                currentUser = doctor;
+                userType = "Doctor";
+                isLoggedIn = true;
+                System.out.println("Welcome, Dr. " + doctor.getName());
+                return;
+            }
+        }
+        
+        // Try to authenticate as patient
+        for (Patient patient : patients) {
+            if (patient.getEmail().equalsIgnoreCase(email) && patient.getPassword().equals(password)) {
+                currentUser = patient;
+                userType = "Patient";
+                isLoggedIn = true;
+                System.out.println("Welcome, " + patient.getName());
+                return;
+            }
+        }
+        
+        // If we reach here, authentication failed
+        throw new RHMSException(
+            RHMSException.ErrorCode.AUTHENTICATION_ERROR,
+            "Invalid email or password.",
+            "User login attempt"
+        );
+    }
+    
+    // Perform user logout
+    private static void performLogout() {
+        currentUser = null;
+        userType = "";
+        isLoggedIn = false;
+        System.out.println("You have been successfully logged out.");
+    }
+    
+    // Display admin dashboard
+    private static void showAdminDashboard() throws RHMSException {
+        System.out.println("\n===== Administrator Dashboard =====");
+        System.out.println("Welcome, " + currentUser.getName());
+        System.out.println("1. Register Patient");
+        System.out.println("2. Register Doctor");
+        System.out.println("3. Register Administrator");
+        System.out.println("4. Schedule Appointment");
+        System.out.println("5. Send Notifications");
+        System.out.println("6. View All Appointments");
+        System.out.println("7. View All Users");
+        System.out.println("8. Logout");
+        System.out.println("0. Exit System");
+        System.out.print("Choose an option: ");
+        
+        int choice = Integer.parseInt(scanner.nextLine().trim());
+        
         switch (choice) {
             case 1: registerPatient(); break;
             case 2: registerDoctor(); break;
-            case 3: scheduleAppointment(); break;
-            case 4: showNotificationMenu(); break;
-            case 5: viewAllAppointments(); break;
-            case 0: return false;
+            case 3: registerAdministrator(); break;
+            case 4: scheduleAppointmentAdmin(); break;
+            case 5: showNotificationMenu(); break;
+            case 6: viewAllAppointments(); break;
+            case 7: viewAllUsers(); break;
+            case 8: performLogout(); break;
+            case 0: 
+                System.out.println("Exiting RHMS System. Goodbye!");
+                System.exit(0);
+                break;
             default:
                 throw new RHMSException(
                     RHMSException.ErrorCode.INVALID_INPUT,
-                    "Invalid admin menu option: " + choice + ". Please select options 0-5.",
-                    "Admin menu selection"
+                    "Invalid admin dashboard option: " + choice + ". Please select a valid option.",
+                    "Admin dashboard selection"
                 );
         }
-        return true;
     }
-
-    private static boolean handlePatientMenu(int choice) throws RHMSException {
-        switch (choice) {
-            case 1: scheduleAppointment(); break;
-            case 2: viewVitals(); break;
-            case 3: provideFeedback(); break;
-            case 4: triggerEmergencyAlert(); break;
-            case 5: togglePanicButton(); break;
-            case 6: joinVideoConsultation(); break;
-            case 7: openChat(); break;
-            case 9: return true;  // Return to user type selection
-            case 0: return false; // Exit system
-            default:
-                throw new RHMSException(
-                    RHMSException.ErrorCode.INVALID_INPUT,
-                    "Invalid patient menu option: " + choice + ". Please select options 0-7 or 9.",
-                    "Patient menu selection"
-                );
-        }
-        return true;
-    }
-
-    private static boolean handleDoctorMenu(int choice) throws RHMSException {
-        switch (choice) {
-            case 1: approveAppointment(); break;
-            case 2: cancelAppointment(); break;
-            case 3: uploadVitals(); break;
-            case 4: viewVitals(); break;
-            case 5: startVideoConsultation(); break;
-            case 6: openChat(); break;
-            case 9: return true;  // Return to user type selection
-            case 0: return false; // Exit system
-            default:
-                throw new RHMSException(
-                    RHMSException.ErrorCode.INVALID_INPUT,
-                    "Invalid doctor menu option: " + choice + ". Please select options 0-6 or 9.",
-                    "Doctor menu selection"
-                );
-        }
-        return true;
-    }
-
-    private static int safeNextInt(String prompt) throws RHMSException {
-        try {
-            if (prompt != null) {
-                System.out.print(prompt);
-            }
-            String input = scanner.nextLine().trim();
-            
-            if (input.isEmpty()) {
-                throw new RHMSException(
-                    RHMSException.ErrorCode.EMPTY_INPUT_ERROR,
-                    "Input cannot be empty",
-                    "Reading numeric input"
-                );
-            }
-
-            return Integer.parseInt(input);
-        } catch (NumberFormatException e) {
-            throw new RHMSException(
-                RHMSException.ErrorCode.NUMERIC_INPUT_ERROR,
-                "Invalid number format. Please enter a valid number.",
-                "Reading numeric input"
-            );
-        }
-    }
-
-    private static void showAdminMenu() {
-        System.out.println("\n===== RHMS Admin Menu =====");
-        System.out.println("1. Register Patient");
-        System.out.println("2. Register Doctor");
-        System.out.println("3. Schedule Appointment");
-        System.out.println("4. Send Notifications");
-        System.out.println("5. View All Appointments");
-        System.out.println("0. Back to User Selection");
-    }
-
-    private static void showPatientMenu() {
+    
+    // Display patient dashboard
+    private static void showPatientDashboard() throws RHMSException {
+        System.out.println("\n===== Patient Dashboard =====");
+        System.out.println("Welcome, " + currentUser.getName());
         System.out.println("1. Schedule an Appointment");
-        System.out.println("2. View Patient Vitals");
-        System.out.println("3. Provide Doctor Feedback");
-        System.out.println("4. Trigger Emergency Alert");
-        System.out.println("5. Enable/Disable Panic Button");
-        System.out.println("6. Join Video Consultation");
-        System.out.println("7. Open Chat");
-        System.out.println("9. Back to User Selection");
-        System.out.println("0. Exit");
+        System.out.println("2. View My Appointments");
+        System.out.println("3. View My Vitals");
+        System.out.println("4. Upload Vitals from CSV");
+        System.out.println("5. View Doctor Feedback & Medications");
+        System.out.println("6. Provide Doctor Feedback");
+        System.out.println("7. View Health Trends & Analysis");  // New option
+        System.out.println("8. View Vitals Graphs");             // New option
+        System.out.println("9. Generate Health Report");         // New option
+        System.out.println("10. Trigger Emergency Alert");
+        System.out.println("11. Enable/Disable Panic Button");
+        System.out.println("12. Join Video Consultation");
+        System.out.println("13. Open Chat");
+        System.out.println("14. Logout");
+        System.out.println("0. Exit System");
         System.out.print("Choose an option: ");
+        
+        int choice = safeNextInt(null);
+        
+        switch (choice) {
+            case 1: scheduleAppointmentPatient(); break;
+            case 2: viewMyAppointments(); break;
+            case 3: viewVitals(); break;
+            case 4: uploadVitalsFromCSV(); break;
+            case 5: viewMyFeedbackAndMedications(); break;
+            case 6: provideFeedback(); break;
+            case 7: viewHealthTrends(); break;           // New feature
+            case 8: viewVitalsGraph(); break;            // New feature
+            case 9: generateReport(); break;             // New feature
+            case 10: triggerEmergencyAlert(); break;
+            case 11: togglePanicButton(); break;
+            case 12: joinVideoConsultation(); break;
+            case 13: openChat(); break;
+            case 14: performLogout(); break;
+            case 0: 
+                System.out.println("Exiting RHMS System. Goodbye!");
+                System.exit(0);
+                break;
+            default:
+                throw new RHMSException(
+                    RHMSException.ErrorCode.INVALID_INPUT,
+                    "Invalid patient dashboard option: " + choice + ". Please select a valid option.",
+                    "Patient dashboard selection"
+                );
+        }
     }
-
-    private static void showDoctorMenu() {
-        System.out.println("1. Approve Appointment");
-        System.out.println("2. Cancel Appointment");
-        System.out.println("3. Upload Vital Signs");
-        System.out.println("4. View Patient Vitals");
-        System.out.println("5. Start Video Consultation");
-        System.out.println("6. Open Chat");
-        System.out.println("9. Back to User Selection");
-        System.out.println("0. Exit");
+    
+    // Display doctor dashboard
+    private static void showDoctorDashboard() throws RHMSException {
+        System.out.println("\n===== Doctor Dashboard =====");
+        System.out.println("Welcome, Dr. " + currentUser.getName());
+        System.out.println("1. View Pending Appointments");
+        System.out.println("2. Approve Appointment");
+        System.out.println("3. Cancel Appointment");
+        System.out.println("4. Upload Patient Vitals");
+        System.out.println("5. View Patient Vitals");
+        System.out.println("6. Provide Prescription & Feedback");
+        System.out.println("7. View Patient Medical History");
+        System.out.println("8. View Patient Health Analytics");  // New option
+        System.out.println("9. View Patient Vitals Graphs");     // New option
+        System.out.println("10. Generate Patient Report");       // New option
+        System.out.println("11. Start Video Consultation");
+        System.out.println("12. Open Chat");
+        System.out.println("13. Logout");
+        System.out.println("0. Exit System");
         System.out.print("Choose an option: ");
+        
+        int choice = safeNextInt(null);
+        
+        switch (choice) {
+            case 1: viewPendingAppointments(); break;
+            case 2: approveAppointment(); break;
+            case 3: cancelAppointment(); break;
+            case 4: uploadVitals(); break;
+            case 5: viewPatientVitals(); break;
+            case 6: providePrescriptionAndFeedback(); break;
+            case 7: viewPatientHistory(); break;
+            case 8: viewHealthTrends(); break;           // New feature
+            case 9: viewVitalsGraph(); break;            // New feature
+            case 10: generateReport(); break;            // New feature
+            case 11: startVideoConsultation(); break;
+            case 12: openChat(); break;
+            case 13: performLogout(); break;
+            case 0: 
+                System.out.println("Exiting RHMS System. Goodbye!");
+                System.exit(0);
+                break;
+            default:
+                throw new RHMSException(
+                    RHMSException.ErrorCode.INVALID_INPUT,
+                    "Invalid doctor dashboard option: " + choice + ". Please select a valid option.",
+                    "Doctor dashboard selection"
+                );
+        }
     }
-
+    
+    // Register a new patient
     private static void registerPatient() {
         try {
-            String name = safeNextString("Enter Patient Name: ", "Patient name", true);
-            String email = safeNextEmail("Enter Email: ");
-            String password = safeNextString("Enter Password: ", "Password", true);
-            String phone = safeNextPhone("Enter Phone: ");
-            String address = safeNextString("Enter Address: ", "Address", true);
-            int userID = getNumericInput("Enter User ID: ", 1, 99999);
-
-            Patient patient = new Patient(name, email, password, phone, address, userID);
-            patients.add(patient);
-            System.out.println("Patient " + name + " registered successfully.");
+            System.out.print("Enter Patient Name: ");
+            String name = scanner.nextLine().trim();
+            System.out.print("Enter Email: ");
+            String email = scanner.nextLine().trim();
+            System.out.print("Enter Password: ");
+            String password = scanner.nextLine().trim();
+            System.out.print("Enter Phone: ");
+            String phone = scanner.nextLine().trim();
+            System.out.print("Enter Address: ");
+            String address = scanner.nextLine().trim();
+            
+            // Generate a unique patient ID
+            int patientID = UserIDManager.getNextPatientID();
+            
+            // Create and add the patient
+            Patient newPatient = new Patient(name, email, password, phone, address, patientID);
+            patients.add(newPatient);
+            
+            System.out.println("Patient registered successfully with ID: " + patientID);
         } catch (Exception e) {
             System.out.println("Error registering patient: " + e.getMessage());
         }
     }
-
+    
+    // Register a new doctor
     private static void registerDoctor() {
         try {
-            String name = safeNextString("Enter Doctor Name: ", "Doctor name", true);
-            String email = safeNextEmail("Enter Email: ");
-            String password = safeNextString("Enter Password: ", "Password", true);
-            String phone = safeNextPhone("Enter Phone: ");
-            String address = safeNextString("Enter Address: ", "Address", true);
-            int userID = getNumericInput("Enter User ID: ", 1, 99999);
+            System.out.print("Enter Doctor Name: ");
+            String name = scanner.nextLine().trim();
+            System.out.print("Enter Email: ");
+            String email = scanner.nextLine().trim();
+            System.out.print("Enter Password: ");
+            String password = scanner.nextLine().trim();
+            System.out.print("Enter Phone: ");
+            String phone = scanner.nextLine().trim();
+            System.out.print("Enter Address: ");
+            String address = scanner.nextLine().trim();
             String specialization = safeNextString("Enter Specialization: ", "Specialization", true);
-            int experienceYears = getNumericInput("Enter Years of Experience: ", 0, 70);
-
-            Doctor doctor = new Doctor(name, email, password, phone, address, userID, specialization, experienceYears);
-            doctors.add(doctor);
-            System.out.println("Doctor " + name + " registered successfully.");
+            int experienceYears = getNumericInput("Enter Years of Experience: ", 0, 50);
+            
+            // Generate a unique doctor ID
+            int doctorID = UserIDManager.getNextDoctorID();
+            
+            // Create and add the doctor
+            Doctor newDoctor = new Doctor(name, email, password, phone, address, doctorID, 
+                                         specialization, experienceYears);
+            doctors.add(newDoctor);
+            
+            System.out.println("Doctor registered successfully with ID: " + doctorID);
         } catch (Exception e) {
             System.out.println("Error registering doctor: " + e.getMessage());
         }
     }
-
-    private static void scheduleAppointment() {
+    
+    // Register a new administrator
+    private static void registerAdministrator() {
         try {
-            System.out.print("Enter Patient Name: ");
-            String patientName = scanner.nextLine();
-            Patient patient = findPatient(patientName);
-            if (patient == null) {
-                throw new RHMSException(
-                    RHMSException.ErrorCode.PATIENT_NOT_FOUND,
-                    "Patient not found: " + patientName
-                );
-            }
-
-            System.out.print("Enter Doctor Name: ");
-            String doctorName = scanner.nextLine();
-            Doctor doctor = findDoctor(doctorName);
-            if (doctor == null) {
-                throw new RHMSException(
-                    RHMSException.ErrorCode.DOCTOR_NOT_FOUND,
-                    "Doctor not found: " + doctorName
-                );
-            }
-
-            System.out.print("Enter Appointment Date (yyyy-MM-dd): ");
-            String dateStr = scanner.nextLine();
-            ErrorHandler.validateAppointmentDate(dateStr);
-            Date appointmentDate = java.sql.Date.valueOf(dateStr);
-
-            String appointmentDetails = "Appointment on " + appointmentDate.toString();
-            patient.scheduleAppointment(appointmentDetails);
-            doctor.manageAppointment(appointmentDetails);
-
-            Appointment appointment = new Appointment(appointmentDate, doctor, patient, "Pending");
-            appointmentManager.getAppointments().add(appointment);
-
-            // Send confirmation notifications
-            String subject = "Appointment Confirmation";
-            String message = String.format("Your appointment with Dr. %s is scheduled for %s", 
-                doctor.getName(), appointmentDate.toString());
+            System.out.print("Enter Administrator Name: ");
+            String name = scanner.nextLine().trim();
+            System.out.print("Enter Email: ");
+            String email = scanner.nextLine().trim();
+            System.out.print("Enter Password: ");
+            String password = scanner.nextLine().trim();
+            System.out.print("Enter Phone: ");
+            String phone = scanner.nextLine().trim();
+            System.out.print("Enter Address: ");
+            String address = scanner.nextLine().trim();
             
-            emailNotification.sendNotification(patient.getEmail(), subject, message);
-            smsNotification.sendNotification(patient.getPhone(), subject, message);
+            // Generate a unique admin ID
+            int adminID = UserIDManager.getNextAdminID();
             
-            System.out.println("Appointment scheduled successfully!");
-        } catch (RHMSException e) {
-            ErrorHandler.handleException(e);
-        }
-    }
-
-    private static void approveAppointment() {
-        if (appointmentManager.getAppointments().isEmpty()) {
-            System.out.println("No appointments found.");
-            return;
-        }
-        appointmentManager.getAppointments().get(0).setStatus("Approved");
-        System.out.println("Appointment Approved!");
-    }
-
-    private static void cancelAppointment() {
-        if (appointmentManager.getAppointments().isEmpty()) {
-            System.out.println("No appointments to cancel.");
-            return;
-        }
-        appointmentManager.getAppointments().get(0).setStatus("Cancelled");
-        System.out.println("Appointment Cancelled!");
-    }
-
-    private static void uploadVitals() {
-        try {
-            String name = safeNextString("Enter Patient Name: ", "Patient name", true);
-            Patient patient = findPatient(name);
-            if (patient == null) {
-                System.out.println("Patient not found!");
-                return;
-            }
-
-            double heartRate = Double.parseDouble(safeNextString("Enter Heart Rate: ", "Heart Rate", true));
-            double oxygenLevel = Double.parseDouble(safeNextString("Enter Oxygen Level: ", "Oxygen Level", true));
-            double bloodPressure = Double.parseDouble(safeNextString("Enter Blood Pressure: ", "Blood Pressure", true));
-            double temperature = Double.parseDouble(safeNextString("Enter Temperature: ", "Temperature", true));
-
-            // Create vital sign record
-            VitalSign vitals = new VitalSign(heartRate, oxygenLevel, bloodPressure, temperature);
+            // Create and add the administrator
+            Administrator newAdmin = new Administrator(name, email, password, phone, address, adminID);
+            administrators.add(newAdmin);
             
-            // Check for emergency conditions and store vitals
-            emergencyAlert.checkVitals(patient, vitals);
-            String vitalsRecord = String.format("HR: %.1f, O2: %.1f%%, BP: %.1f, Temp: %.1f°C", 
-                heartRate, oxygenLevel, bloodPressure, temperature);
-            patient.uploadMedicalRecord(vitalsRecord);
-
-            System.out.println("Vitals uploaded successfully!");
-        } catch (NumberFormatException e) {
-            System.out.println("Error: Please enter valid numbers for vital signs.");
+            System.out.println("Administrator registered successfully with ID: " + adminID);
         } catch (Exception e) {
-            System.out.println("Error uploading vitals: " + e.getMessage());
+            System.out.println("Error registering administrator: " + e.getMessage());
         }
     }
-
-    private static void viewVitals() {
-        System.out.print("Enter Patient Name: ");
-        String name = scanner.nextLine();
-        Patient patient = findPatient(name);
-        if (patient == null) {
-            System.out.println("Patient not found!");
+    
+    // View appointments for the logged-in patient
+    private static void viewMyAppointments() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("Error: This feature is only available for patients.");
             return;
         }
-
-        System.out.println("\nMedical Records:");
-        for (String record : patient.getDoctorFeedback()) {
-            System.out.println(record);
-        }
-    }
-
-    private static void provideFeedback() {
-        System.out.print("Enter Doctor Name: ");
-        String doctorName = scanner.nextLine();
-        Doctor doctor = findDoctor(doctorName);
-        if (doctor == null) {
-            System.out.println("Doctor not found!");
-            return;
-        }
-
-        System.out.print("Enter Patient Name: ");
-        String patientName = scanner.nextLine();
-        Patient patient = findPatient(patientName);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
-        }
-
-        System.out.print("Enter Feedback: ");
-        String feedback = scanner.nextLine();
-
-        doctor.provideFeedback(patient, feedback);
-        System.out.println("Feedback recorded successfully!");
-    }
-
-    private static void triggerEmergencyAlert() {
-        System.out.print("Enter patient name: ");
-        String name = scanner.nextLine();
-        Patient patient = findPatient(name);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
-        }
-
-        System.out.print("Enter emergency reason: ");
-        String reason = scanner.nextLine();
-
-        PanicButton panicButton = new PanicButton(patient);
-        panicButton.triggerAlert(reason);
-    }
-
-    private static void togglePanicButton() {
-        System.out.print("Enter patient name: ");
-        String name = scanner.nextLine();
-        Patient patient = findPatient(name);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
-        }
-
-        System.out.println("\nCurrent panic button status: " + patient.getPanicButton().getStatus());
-        System.out.println("1. Enable Panic Button");
-        System.out.println("2. Disable Panic Button");
-        System.out.println("0. Back");
-        System.out.print("Choose an option: ");
         
-        int choice = scanner.nextInt();
-        scanner.nextLine(); // Consume newline
+        Patient patient = (Patient) currentUser;
+        ArrayList<Appointment> patientAppointments = appointmentManager.getPatientAppointments(patient);
         
-        switch (choice) {
-            case 1:
-                patient.enablePanicButton();
-                break;
-            case 2:
-                patient.disablePanicButton();
-                break;
-            case 0:
-                return;
-            default:
-                System.out.println("Invalid choice!");
-        }
-    }
-
-    private static void startVideoConsultation() {
-        System.out.print("Enter patient name: ");
-        String patientName = scanner.nextLine();
-        Patient patient = findPatient(patientName);
-        if (patient == null) {
-            System.out.println("Patient not found!");
-            return;
-        }
-
-        String meetingId = VideoCall.generateMeetingId();
-        System.out.println("Starting video consultation...");
-        System.out.println("Meeting ID: " + meetingId);
-        
-        VideoCall.startVideoCall(meetingId);
-    }
-
-    private static void joinVideoConsultation() {
-        System.out.print("Enter meeting ID: ");
-        String meetingId = scanner.nextLine();
-        
-        VideoCall.startVideoCall(meetingId);
-    }
-
-    private static void openChat() {
-        System.out.print("Enter the name of user to chat with: ");
-        String otherUser = scanner.nextLine();
-        
-        if (userType.equals("Doctor")) {
-            Patient patient = findPatient(otherUser);
-            if (patient == null) {
-                System.out.println("Patient not found!");
-                return;
-            }
-            otherUser = patient.getName();
+        System.out.println("\n=== My Appointments ===");
+        if (patientAppointments.isEmpty()) {
+            System.out.println("You have no appointments scheduled.");
         } else {
-            Doctor doctor = findDoctor(otherUser);
-            if (doctor == null) {
-                System.out.println("Doctor not found!");
-                return;
-            }
-            otherUser = doctor.getName();
-        }
-
-        ChatClient chatClient = chatClients.computeIfAbsent(
-            userType.equals("Doctor") ? otherUser : otherUser,
-            name -> new ChatClient(
-                userType.equals("Doctor") ? findDoctor(userType) : findPatient(userType),
-                chatServer
-            )
-        );
-
-        while (true) {
-            System.out.println("\n1. Send Message");
-            System.out.println("2. View Chat History");
-            System.out.println("0. Back");
-            System.out.print("Choose an option: ");
-            
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // Consume newline
-            
-            switch (choice) {
-                case 1:
-                    System.out.print("Enter message: ");
-                    String message = scanner.nextLine();
-                    chatClient.sendMessage(otherUser, message);
-                    break;
-                case 2:
-                    chatClient.displayChat(otherUser);
-                    break;
-                case 0:
-                    return;
-                default:
-                    System.out.println("Invalid choice!");
+            for (Appointment appointment : patientAppointments) {
+                System.out.println(appointment);
             }
         }
     }
-
-    private static Patient findPatient(String name) {
-        for (Patient patient : patients) {
-            if (patient.getName().equalsIgnoreCase(name)) {
-                return patient;
-            }
-        }
-        return null;
-    }
-
-    private static Doctor findDoctor(String name) {
-        for (Doctor doctor : doctors) {
-            if (doctor.getName().equalsIgnoreCase(name)) {
-                return doctor;
-            }
-        }
-        return null;
-    }
-
-    private static void sendNotification() {
-        System.out.println("\n=== Send Notification ===");
-        System.out.println("1. Send Appointment Reminder");
-        System.out.println("2. Send Medication Reminder");
-        System.out.println("3. Send Custom Message");
-        System.out.println("0. Back");
-        System.out.print("Choose an option: ");
-
-        int choice = scanner.nextInt();
-        scanner.nextLine(); // Consume newline
-
-        System.out.print("Enter patient name: ");
-        String patientName = scanner.nextLine();
-        Patient patient = findPatient(patientName);
-        if (patient == null) {
-            System.out.println("Patient not found!");
+    
+    // View pending appointments for the logged-in doctor
+    private static void viewPendingAppointments() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Error: This feature is only available for doctors.");
             return;
         }
-
-        switch (choice) {
-            case 1:
-                sendAppointmentReminder(patient);
-                break;
-            case 2:
-                sendMedicationReminder(patient);
-                break;
-            case 3:
-                sendCustomMessage(patient);
-                break;
-            case 0:
-                return;
-            default:
-                System.out.println("Invalid choice!");
-        }
-    }
-
-    private static void sendAppointmentReminder(Patient patient) {
-        System.out.print("Enter appointment date (e.g., tomorrow 2:30 PM): ");
-        String appointmentTime = scanner.nextLine();
         
-        String subject = "Appointment Reminder";
-        String message = String.format("Dear %s, you have an appointment scheduled for %s.", 
-            patient.getName(), appointmentTime);
+        Doctor doctor = (Doctor) currentUser;
+        ArrayList<Appointment> pendingAppointments = appointmentManager.getDoctorPendingAppointments(doctor);
         
-        smsNotification.sendNotification(patient.getPhone(), subject, message);
-        reminderService.sendImmediateReminder(patient, subject, message);
-    }
-
-    private static void sendMedicationReminder(Patient patient) {
-        System.out.print("Enter medication name: ");
-        String medication = scanner.nextLine();
-        System.out.print("Enter schedule (e.g., twice daily): ");
-        String schedule = scanner.nextLine();
-        
-        reminderService.scheduleMedicationReminder(patient, medication, schedule);
-        System.out.println("Medication reminder set successfully!");
-    }
-
-    private static void sendCustomMessage(Patient patient) {
-        System.out.print("Enter message subject: ");
-        String subject = scanner.nextLine();
-        System.out.print("Enter message content: ");
-        String message = scanner.nextLine();
-        
-        smsNotification.sendNotification(patient.getPhone(), subject, message);
-        System.out.println("Custom message sent successfully!");
-    }
-
-    private static void showNotificationMenu() {
-        while (true) {
-            System.out.println("\n===== Notification Menu =====");
-            System.out.println("1. Send Email");
-            System.out.println("2. Send SMS");
-            System.out.println("3. Send Both Email and SMS");
-            System.out.println("0. Back");
-            System.out.print("Choose an option: ");
-
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // Consume newline
-
-            if (choice == 0) return;
-
-            System.out.print("Enter patient name: ");
-            String patientName = scanner.nextLine();
-            Patient patient = findPatient(patientName);
-            
-            if (patient == null) {
-                System.out.println("Patient not found!");
-                continue;
-            }
-
-            System.out.print("Enter subject: ");
-            String subject = scanner.nextLine();
-            System.out.print("Enter message: ");
-            String message = scanner.nextLine();
-
-            switch (choice) {
-                case 1:
-                    emailNotification.sendNotification(patient.getEmail(), subject, message);
-                    break;
-                case 2:
-                    smsNotification.sendNotification(patient.getPhone(), subject, message);
-                    break;
-                case 3:
-                    emailNotification.sendNotification(patient.getEmail(), subject, message);
-                    smsNotification.sendNotification(patient.getPhone(), subject, message);
-                    break;
-                default:
-                    System.out.println("Invalid choice!");
+        System.out.println("\n=== Pending Appointments ===");
+        if (pendingAppointments.isEmpty()) {
+            System.out.println("You have no pending appointments.");
+        } else {
+            for (Appointment appointment : pendingAppointments) {
+                System.out.println(appointment);
             }
         }
     }
-
-    private static void viewAllAppointments() {
-        System.out.println("\n=== All Appointments ===");
-        for (Appointment appointment : appointmentManager.getAppointments()) {
-            System.out.println(appointment);
+    
+    // Approve a pending appointment
+    private static void approveAppointment() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Only doctors can approve appointments.");
+            return;
+        }
+        
+        Doctor doctor = (Doctor) currentUser;
+        ArrayList<Appointment> pendingAppointments = appointmentManager.getDoctorPendingAppointments(doctor);
+        
+        System.out.println("\n=== Approve Appointment ===");
+        if (pendingAppointments.isEmpty()) {
+            System.out.println("No pending appointments to approve.");
+            return;
+        }
+        
+        // Display pending appointments
+        for (int i = 0; i < pendingAppointments.size(); i++) {
+            System.out.println((i + 1) + ". " + pendingAppointments.get(i));
+        }
+        
+        System.out.print("Enter appointment number to approve (0 to cancel): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) {
+            return;
+        }
+        
+        if (selection < 1 || selection > pendingAppointments.size()) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        Appointment selectedAppointment = pendingAppointments.get(selection - 1);
+        appointmentManager.approveAppointment(selectedAppointment);
+        
+        // Send notification to patient
+        Patient patient = selectedAppointment.getPatient();
+        String message = "Your appointment with Dr. " + doctor.getName() + 
+                         " on " + selectedAppointment.getAppointmentDate() + 
+                         " has been approved.";
+        
+        if (patient.getPhone() != null) {
+            smsNotification.sendNotification(patient.getPhone(), message);
+        }
+        
+        System.out.println("Appointment approved successfully!");
+    }
+    
+    // Cancel an appointment
+    private static void cancelAppointment() {
+        ArrayList<Appointment> relevantAppointments = new ArrayList<>();
+        
+        System.out.println("\n=== Cancel Appointment ===");
+        
+        // Show different appointments based on user type
+        if (currentUser instanceof Doctor) {
+            Doctor doctor = (Doctor) currentUser;
+            relevantAppointments = appointmentManager.getDoctorActiveAppointments(doctor);
+        } else if (currentUser instanceof Patient) {
+            Patient patient = (Patient) currentUser;
+            relevantAppointments = appointmentManager.getPatientAppointments(patient);
+            // Filter out cancelled appointments
+            relevantAppointments.removeIf(appointment -> appointment.getStatus().equals("Cancelled"));
+        } else {
+            System.out.println("Only doctors and patients can cancel appointments.");
+            return;
+        }
+        
+        if (relevantAppointments.isEmpty()) {
+            System.out.println("No active appointments to cancel.");
+            return;
+        }
+        
+        // Display active appointments
+        for (int i = 0; i < relevantAppointments.size(); i++) {
+            System.out.println((i + 1) + ". " + relevantAppointments.get(i));
+        }
+        
+        System.out.print("Enter appointment number to cancel (0 to go back): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) {
+            return;
+        }
+        
+        if (selection < 1 || selection > relevantAppointments.size()) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        Appointment selectedAppointment = relevantAppointments.get(selection - 1);
+        appointmentManager.cancelAppointment(selectedAppointment);
+        
+        // Send notifications to relevant parties
+        Doctor doctor = selectedAppointment.getDoctor();
+        Patient patient = selectedAppointment.getPatient();
+        
+        String cancelledBy = (currentUser instanceof Doctor) ? "Dr. " + currentUser.getName() : patient.getName();
+        String message = "Appointment on " + selectedAppointment.getAppointmentDate() + 
+                         " has been cancelled by " + cancelledBy + ".";
+        
+        // Notify the other party
+        if (currentUser instanceof Doctor && patient.getPhone() != null) {
+            smsNotification.sendNotification(patient.getPhone(), message);
+        } else if (currentUser instanceof Patient && doctor.getPhone() != null) {
+            smsNotification.sendNotification(doctor.getPhone(), message);
+        }
+        
+        System.out.println("Appointment cancelled successfully!");
+    }
+    
+    // View all registered users (admin only)
+    private static void viewAllUsers() {
+        System.out.println("\n=== All Registered Users ===");
+        
+        System.out.println("\nAdministrators:");
+        if (administrators.isEmpty()) {
+            System.out.println("No administrators registered.");
+        } else {
+            for (Administrator admin : administrators) {
+                System.out.println("- " + admin.getName() + " (ID: " + admin.getUserID() + ", Email: " + admin.getEmail() + ")");
+            }
+        }
+        
+        System.out.println("\nDoctors:");
+        if (doctors.isEmpty()) {
+            System.out.println("No doctors registered.");
+        } else {
+            for (Doctor doctor : doctors) {
+                System.out.println("- Dr. " + doctor.getName() + " (ID: " + doctor.getUserID() + 
+                                  ", Specialization: " + doctor.getSpecialization() + ")");
+            }
+        }
+        
+        System.out.println("\nPatients:");
+        if (patients.isEmpty()) {
+            System.out.println("No patients registered.");
+        } else {
+            for (Patient patient : patients) {
+                System.out.println("- " + patient.getName() + " (ID: " + patient.getUserID() + ")");
+            }
         }
     }
-
-    /**
-     * Safely captures a string input with validation
-     * @param prompt Message to display to the user
-     * @param fieldName Name of the field (for error messages)
-     * @param required Whether the field is required
-     * @return The validated string input
-     * @throws RHMSException if validation fails
-     */
-    private static String safeNextString(String prompt, String fieldName, boolean required) throws RHMSException {
+    
+    // Safe input method for handling integer inputs with validation
+    private static int safeNextInt(String prompt) {
+        if (prompt != null) {
+            System.out.print(prompt);
+        }
+        try {
+            return Integer.parseInt(scanner.nextLine().trim());
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number.");
+            return safeNextInt(prompt);
+        }
+    }
+    
+    // Safe string input method with validation
+    private static String safeNextString(String prompt, String fieldName, boolean required) {
         System.out.print(prompt);
         String input = scanner.nextLine().trim();
         
         if (required && input.isEmpty()) {
-            throw new RHMSException(
-                RHMSException.ErrorCode.EMPTY_INPUT_ERROR,
-                fieldName + " cannot be empty",
-                "Entering " + fieldName.toLowerCase()
-            );
+            System.out.println(fieldName + " cannot be empty. Please try again.");
+            return safeNextString(prompt, fieldName, required);
         }
-        
         return input;
     }
-
-    /**
-     * Safely captures a date input with validation
-     * @param prompt Message to display to the user
-     * @return The validated date string
-     * @throws RHMSException if validation fails
-     */
-    private static String safeNextDate(String prompt) throws RHMSException {
-        System.out.print(prompt);
-        String dateStr = scanner.nextLine().trim();
-        ErrorHandler.validateAppointmentDate(dateStr);
-        return dateStr;
+    
+    // Get numeric input with range validation
+    private static int getNumericInput(String prompt, int min, int max) {
+        int value = safeNextInt(prompt);
+        if (value < min || value > max) {
+            System.out.println("Input must be between " + min + " and " + max + ". Please try again.");
+            return getNumericInput(prompt, min, max);
+        }
+        return value;
     }
-
-    /**
-     * Safely captures an email input with validation
-     * @param prompt Message to display to the user
-     * @return The validated email string
-     * @throws RHMSException if validation fails
-     */
-    private static String safeNextEmail(String prompt) throws RHMSException {
-        System.out.print(prompt);
-        String email = scanner.nextLine().trim();
-        ErrorHandler.validateEmail(email);
-        return email;
-    }
-
-    /**
-     * Safely captures a phone input with validation
-     * @param prompt Message to display to the user
-     * @return The validated phone string
-     * @throws RHMSException if validation fails
-     */
-    private static String safeNextPhone(String prompt) throws RHMSException {
-        System.out.print(prompt);
-        String phone = scanner.nextLine().trim();
-        ErrorHandler.validatePhone(phone);
-        return phone;
-    }
-
-    /**
-     * Safely captures a name input with validation
-     * @param prompt Message to display to the user
-     * @param fieldName Name of the field (for error messages)
-     * @return The validated name string
-     * @throws RHMSException if validation fails
-     */
-    private static String safeNextName(String prompt, String fieldName) throws RHMSException {
-        System.out.print(prompt);
-        String name = scanner.nextLine().trim();
-        ErrorHandler.validateName(name, fieldName);
-        return name;
-    }
-
-    /**
-     * Safely captures a numeric input with validation
-     * @param prompt Message to display to the user
-     * @param minValue Minimum acceptable value
-     * @param maxValue Maximum acceptable value
-     * @return The validated numeric input
-     */
-    private static int getNumericInput(String prompt, int minValue, int maxValue) {
-        while (true) {
-            try {
-                System.out.print(prompt);
-                String input = scanner.nextLine().trim();
-                
-                // Check for empty input
-                if (input.isEmpty()) {
-                    System.out.println("Error: Input cannot be empty. Please try again.");
-                    continue;
-                }
-
-                // Try to convert to integer
-                int value = Integer.parseInt(input);
-                
-                // Validate range
-                if (value < minValue || value > maxValue) {
-                    System.out.printf("Error: Please enter a number between %d and %d\n", minValue, maxValue);
-                    continue;
-                }
-
-                return value;
-
-            } catch (NumberFormatException e) {
-                System.out.println("Error: Please enter a valid number.");
+    
+    // View all appointments
+    private static void viewAllAppointments() {
+        System.out.println("\n=== All Appointments ===");
+        ArrayList<Appointment> allAppointments = appointmentManager.getAppointments();
+        
+        if (allAppointments.isEmpty()) {
+            System.out.println("No appointments scheduled.");
+        } else {
+            for (Appointment appointment : allAppointments) {
+                System.out.println(appointment);
             }
+        }
+    }
+    
+    // Upload vitals data (for doctors)
+    private static void uploadVitals() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Only doctors can upload patient vital signs.");
+            return;
+        }
+        
+        try {
+            // Show list of patients
+            System.out.println("\n=== Upload Patient Vitals ===");
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Select patient (enter number): ");
+            int patientIndex = safeNextInt(null) - 1;
+            
+            if (patientIndex < 0 || patientIndex >= patients.size()) {
+                System.out.println("Invalid patient selection.");
+                return;
+            }
+            
+            Patient selectedPatient = patients.get(patientIndex);
+            
+            System.out.println("\nEnter vital signs for " + selectedPatient.getName() + ":");
+            
+            // Get vital signs with validation
+            double heartRate = getNumericInput("Enter heart rate (bpm): ", 40, 120);
+            double oxygenLevel = getNumericInput("Enter oxygen level (%): ", 90, 100);
+            double bloodPressure = getNumericInput("Enter blood pressure (systolic): ", 90, 140);
+            double temperature = getNumericInput("Enter temperature (°C): ", 35, 40);
+            
+            // Create vital sign object
+            VitalSign vitalSign = new VitalSign(heartRate, oxygenLevel, bloodPressure, temperature);
+            
+            // Add vital sign to the patient's database
+            VitalsDatabase patientVitals = selectedPatient.getVitalsDatabase();
+            if (patientVitals == null) {
+                patientVitals = new VitalsDatabase(selectedPatient);
+                selectedPatient.setVitalsDatabase(patientVitals);
+            }
+            
+            patientVitals.addVitalRecord(vitalSign);
+            System.out.println("Vital signs recorded successfully for " + selectedPatient.getName());
+            
+            // Check for abnormal vitals and trigger alert if needed
+            emergencyAlert.checkVitals(selectedPatient, vitalSign);
+            
+        } catch (Exception e) {
+            System.out.println("Error recording vital signs: " + e.getMessage());
+        }
+    }
+    
+    // View patient vitals (for both doctors and patients)
+    private static void viewVitals() {
+        try {
+            if (currentUser instanceof Patient) {
+                // Patient viewing their own vitals
+                Patient patient = (Patient) currentUser;
+                VitalsDatabase vitalsDB = patient.getVitalsDatabase();
+                
+                if (vitalsDB == null || vitalsDB.getVitals().isEmpty()) {
+                    System.out.println("\nNo vital records found for you.");
+                    return;
+                }
+                
+                System.out.println("\n=== Your Vital Records ===");
+                vitalsDB.displayAllVitals();
+                
+            } else if (currentUser instanceof Doctor) {
+                // Doctor viewing patient vitals
+                System.out.println("\n=== View Patient Vitals ===");
+                if (patients.isEmpty()) {
+                    System.out.println("No patients available in the system.");
+                    return;
+                }
+                
+                // Show list of patients
+                for (int i = 0; i < patients.size(); i++) {
+                    System.out.println((i + 1) + ". " + patients.get(i).getName());
+                }
+                
+                System.out.print("Select patient (enter number): ");
+                int patientIndex = safeNextInt(null) - 1;
+                
+                if (patientIndex < 0 || patientIndex >= patients.size()) {
+                    System.out.println("Invalid patient selection.");
+                    return;
+                }
+                
+                Patient selectedPatient = patients.get(patientIndex);
+                VitalsDatabase vitalsDB = selectedPatient.getVitalsDatabase();
+                
+                if (vitalsDB == null || vitalsDB.getVitals().isEmpty()) {
+                    System.out.println("No vital records found for " + selectedPatient.getName());
+                    return;
+                }
+                
+                System.out.println("\n=== Vital Records for " + selectedPatient.getName() + " ===");
+                vitalsDB.displayAllVitals();
+            }
+        } catch (Exception e) {
+            System.out.println("Error viewing vitals: " + e.getMessage());
+        }
+    }
+    
+    // Upload vitals data from CSV file
+    private static void uploadVitalsFromCSV() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("This feature is only available for patients.");
+            return;
+        }
+        
+        Patient patient = (Patient) currentUser;
+        
+        try {
+            System.out.println("\n=== Upload Vitals from CSV ===");
+            System.out.print("Enter CSV filename or path: ");
+            String filename = scanner.nextLine().trim();
+            
+            // Check if file exists
+            java.io.File file = new java.io.File(filename);
+            if (!file.exists()) {
+                System.out.println("Error: File not found: " + filename);
+                return;
+            }
+            
+            // Process the CSV file
+            CSVVitalsProcessor processor = new CSVVitalsProcessor();
+            ArrayList<VitalSign> vitalSigns = processor.processCSVFile(filename);
+            
+            if (vitalSigns.isEmpty()) {
+                System.out.println("No valid vital records found in the CSV file.");
+                return;
+            }
+            
+            // Initialize vitals database if needed
+            if (patient.getVitalsDatabase() == null) {
+                patient.setVitalsDatabase(new VitalsDatabase(patient));
+            }
+            
+            // Add each vital sign to the patient's database
+            for (VitalSign vitalSign : vitalSigns) {
+                patient.getVitalsDatabase().addVitalRecord(vitalSign);
+                System.out.println("Recorded vital sign: " +
+                    "Heart Rate=" + vitalSign.getHeartRate() + "bpm, " +
+                    "Oxygen=" + vitalSign.getOxygenLevel() + "%, " +
+                    "BP=" + vitalSign.getBloodPressure() + "mmHg, " +
+                    "Temp=" + vitalSign.getTemperature() + "°C");
+                
+                // Check for abnormal values that might trigger an emergency
+                emergencyAlert.checkVitals(patient, vitalSign);
+            }
+            
+            System.out.println("\nSuccessfully uploaded " + vitalSigns.size() + " vital records.");
+            
+        } catch (java.io.IOException e) {
+            System.out.println("Error reading file: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Error processing file: " + e.getMessage());
+        }
+    }
+    
+    // Trigger emergency alert
+    private static void triggerEmergencyAlert() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("Only patients can trigger emergency alerts.");
+            return;
+        }
+        
+        Patient patient = (Patient) currentUser;
+        
+        System.out.print("Enter emergency reason: ");
+        String reason = scanner.nextLine().trim();
+        
+        System.out.println("Emergency alert triggered! Help is on the way.");
+        patient.triggerPanicButton(reason);
+    }
+    
+    // Toggle panic button status
+    private static void togglePanicButton() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("Only patients can use panic button features.");
+            return;
+        }
+        
+        Patient patient = (Patient) currentUser;
+        
+        if (patient.getPanicButton().isActive()) {
+            patient.disablePanicButton();
+            System.out.println("Panic button has been disabled.");
+        } else {
+            patient.enablePanicButton();
+            System.out.println("Panic button has been enabled.");
+        }
+    }
+    
+    // Join video consultation
+    private static void joinVideoConsultation() {
+        System.out.println("\n=== Join Video Consultation ===");
+        System.out.println("1. Join with meeting ID");
+        System.out.println("2. Start new meeting");
+        System.out.print("Choose option: ");
+        
+        int choice = safeNextInt(null);
+        
+        if (choice == 1) {
+            System.out.print("Enter meeting ID: ");
+            String meetingId = scanner.nextLine().trim();
+            System.out.println("Joining video call...");
+            VideoCall.startVideoCall(meetingId);
+        } else if (choice == 2) {
+            String meetingId = VideoCall.generateMeetingId();
+            System.out.println("Your meeting ID is: " + meetingId);
+            System.out.println("Launching video call...");
+            VideoCall.startVideoCall(meetingId);
+        } else {
+            System.out.println("Invalid choice.");
+        }
+    }
+    
+    // Start video consultation (doctor-side)
+    private static void startVideoConsultation() {
+        System.out.println("\n=== Start Video Consultation ===");
+        String meetingId = VideoCall.generateMeetingId();
+        System.out.println("Your meeting ID is: " + meetingId);
+        System.out.println("Launching video call...");
+        
+        VideoCall.startVideoCall(meetingId);
+        
+        System.out.println("Please share this meeting ID with your patient.");
+    }
+    
+    // Open chat interface
+    private static void openChat() {
+        System.out.println("\n=== Chat Interface ===");
+        
+        // Create chat client
+        ChatClient chatClient = new ChatClient(currentUser, chatServer);
+        
+        // Show users to chat with
+        if ("Patient".equals(userType)) {
+            System.out.println("Available doctors to chat with:");
+            for (int i = 0; i < doctors.size(); i++) {
+                System.out.println((i + 1) + ". Dr. " + doctors.get(i).getName());
+            }
+        } else if ("Doctor".equals(userType)) {
+            System.out.println("Available patients to chat with:");
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+        }
+        
+        System.out.print("Select user to chat with (enter number, or 0 to exit): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) {
+            return;
+        }
+        
+        String recipient;
+        if ("Patient".equals(userType) && selection > 0 && selection <= doctors.size()) {
+            recipient = doctors.get(selection - 1).getName();
+        } else if ("Doctor".equals(userType) && selection > 0 && selection <= patients.size()) {
+            recipient = patients.get(selection - 1).getName();
+        } else {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        // Show chat history
+        chatClient.displayChat(recipient);
+        
+        // Send a message
+        System.out.print("Enter your message (or 'exit' to return): ");
+        String message = scanner.nextLine().trim();
+        
+        if (!message.equalsIgnoreCase("exit")) {
+            chatClient.sendMessage(recipient, message);
+            System.out.println("Message sent!");
+        }
+    }
+    
+    // Provide feedback to doctor
+    private static void provideFeedback() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("Only patients can provide feedback to doctors.");
+            return;
+        }
+        
+        try {
+            System.out.println("\n=== Provide Doctor Feedback ===");
+            
+            // Show available doctors
+            if (doctors.isEmpty()) {
+                System.out.println("No doctors available to provide feedback for.");
+                return;
+            }
+            
+            System.out.println("Select doctor to provide feedback:");
+            for (int i = 0; i < doctors.size(); i++) {
+                System.out.println((i + 1) + ". Dr. " + doctors.get(i).getName());
+            }
+            
+            System.out.print("Enter choice (0 to cancel): ");
+            int doctorIndex = safeNextInt(null);
+            
+            if (doctorIndex == 0) {
+                return;
+            }
+            
+            doctorIndex--;
+            if (doctorIndex < 0 || doctorIndex >= doctors.size()) {
+                System.out.println("Invalid doctor selection.");
+                return;
+            }
+            
+            Doctor selectedDoctor = doctors.get(doctorIndex);
+            
+            System.out.print("Enter your feedback: ");
+            String feedback = scanner.nextLine().trim();
+            
+            Patient patient = (Patient) currentUser;
+            selectedDoctor.provideFeedback(patient, feedback);
+            
+            System.out.println("Thank you for your feedback! It has been recorded.");
+        } catch (Exception e) {
+            System.out.println("Error providing feedback: " + e.getMessage());
+        }
+    }
+
+    // Doctor views patient vitals
+    private static void viewPatientVitals() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Only doctors can access this feature.");
+            return;
+        }
+        
+        try {
+            System.out.println("\n=== View Patient Vitals ===");
+            if (patients.isEmpty()) {
+                System.out.println("No patients available in the system.");
+                return;
+            }
+            
+            // Show list of patients
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Select patient (enter number): ");
+            int patientIndex = safeNextInt(null) - 1;
+            
+            if (patientIndex < 0 || patientIndex >= patients.size()) {
+                System.out.println("Invalid patient selection.");
+                return;
+            }
+            
+            Patient selectedPatient = patients.get(patientIndex);
+            VitalsDatabase vitalsDB = selectedPatient.getVitalsDatabase();
+            
+            if (vitalsDB == null || vitalsDB.getVitals().isEmpty()) {
+                System.out.println("No vital records found for " + selectedPatient.getName());
+                return;
+            }
+            
+            System.out.println("\n=== Vital Records for " + selectedPatient.getName() + " ===");
+            vitalsDB.displayAllVitals();
+            
+        } catch (Exception e) {
+            System.out.println("Error viewing patient vitals: " + e.getMessage());
+        }
+    }
+    
+    // Doctor provides feedback and prescribes medications
+    private static void providePrescriptionAndFeedback() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Only doctors can access this feature.");
+            return;
+        }
+        
+        Doctor doctor = (Doctor) currentUser;
+        
+        try {
+            System.out.println("\n=== Provide Prescription & Feedback ===");
+            if (patients.isEmpty()) {
+                System.out.println("No patients available in the system.");
+                return;
+            }
+            
+            // Show list of patients
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Select patient (enter number): ");
+            int patientIndex = safeNextInt(null) - 1;
+            
+            if (patientIndex < 0 || patientIndex >= patients.size()) {
+                System.out.println("Invalid patient selection.");
+                return;
+            }
+            
+            Patient selectedPatient = patients.get(patientIndex);
+            
+            // Get feedback from doctor
+            System.out.print("Enter your medical feedback: ");
+            String feedback = scanner.nextLine().trim();
+            
+            // Create prescription
+            System.out.print("Do you want to prescribe medication? (Y/N): ");
+            String prescribeChoice = scanner.nextLine().trim();
+            
+            Prescription prescription = null;
+            if (prescribeChoice.equalsIgnoreCase("Y")) {
+                System.out.print("Enter medication name: ");
+                String medicationName = scanner.nextLine().trim();
+                
+                System.out.print("Enter dosage: ");
+                String dosage = scanner.nextLine().trim();
+                
+                System.out.print("Enter schedule (e.g. twice daily): ");
+                String schedule = scanner.nextLine().trim();
+                
+                prescription = new Prescription(medicationName, dosage, schedule);
+            }
+            
+            // Create feedback object and store it
+            Feedback feedbackRecord = new Feedback(doctor, selectedPatient, feedback, prescription);
+            // Associate with patient's medical history
+            MedicalHistory medicalHistory = selectedPatient.getMedicalHistory();
+            if (medicalHistory == null) {
+                medicalHistory = new MedicalHistory();
+                selectedPatient.setMedicalHistory(medicalHistory);
+            }
+            medicalHistory.addConsultation(feedbackRecord);
+            System.out.println("Feedback and prescription recorded successfully!");
+        } catch (Exception e) {
+            System.out.println("Error providing prescription and feedback: " + e.getMessage());
+        }
+    }
+    
+    // Doctor views patient's medical history
+    private static void viewPatientHistory() {
+        if (!(currentUser instanceof Doctor)) {
+            System.out.println("Only doctors can access this feature.");
+            return;
+        }
+        
+        try {
+            System.out.println("\n=== View Patient Medical History ===");
+            if (patients.isEmpty()) {
+                System.out.println("No patients available in the system.");
+                return;
+            }
+            
+            // Show list of patients
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Select patient (enter number): ");
+            int patientIndex = safeNextInt(null) - 1;
+            
+            if (patientIndex < 0 || patientIndex >= patients.size()) {
+                System.out.println("Invalid patient selection.");
+                return;
+            }
+            
+            Patient selectedPatient = patients.get(patientIndex);
+            MedicalHistory medicalHistory = selectedPatient.getMedicalHistory();
+            if (medicalHistory == null || medicalHistory.getPastConsultations().isEmpty()) {
+                System.out.println("No medical history available for " + selectedPatient.getName());
+                return;
+            }
+            
+            System.out.println("\n=== Medical History for " + selectedPatient.getName() + " ===");
+            medicalHistory.displayMedicalHistory();
+            
+        } catch (Exception e) {
+            System.out.println("Error viewing patient history: " + e.getMessage());
+        }
+    }
+    
+    // Patient views doctor feedback and medication history
+    private static void viewMyFeedbackAndMedications() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("Only patients can access this feature.");
+            return;
+        }
+        
+        Patient patient = (Patient) currentUser;
+        MedicalHistory medicalHistory = patient.getMedicalHistory();
+        if (medicalHistory == null || medicalHistory.getPastConsultations().isEmpty()) {
+            System.out.println("\nNo feedback or medication records available.");
+            return;
+        }
+        
+        System.out.println("\n=== Your Medical Feedback & Medications ===");       
+        medicalHistory.displayMedicalHistory();
+    }
+    
+    // View and analyze health trends
+    private static void viewHealthTrends() {
+        Patient selectedPatient = null;
+        
+        if (currentUser instanceof Patient) {
+            selectedPatient = (Patient) currentUser;
+        } else if (currentUser instanceof Doctor) {
+            System.out.println("\n=== Select Patient for Health Analytics ===");
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Enter patient number (0 to cancel): ");
+            int selection = safeNextInt(null);
+            
+            if (selection == 0) {
+                return;
+            }
+            
+            if (selection < 1 || selection > patients.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            selectedPatient = patients.get(selection - 1);
+        } else {
+            System.out.println("Error: This feature is only available for patients and doctors.");
+            return;
+        }
+        
+        // Create analytics instance and analyze data
+        HealthAnalytics analytics = new HealthAnalytics();
+        AnalyticsResult result = analytics.analyzePatientData(selectedPatient);
+        
+        // Display analysis results
+        result.displayResults();
+    }
+    
+    // View vitals graphs
+    private static void viewVitalsGraph() {
+        if (!(currentUser instanceof Patient || currentUser instanceof Doctor)) {
+            System.out.println("Error: This feature is only available for patients and doctors.");
+            return;
+        }
+        
+        Patient selectedPatient = null;
+        
+        // If current user is a patient, use their data
+        if (currentUser instanceof Patient) {
+            selectedPatient = (Patient) currentUser;
+        }
+        // If current user is a doctor, select a patient
+        else if (currentUser instanceof Doctor) {
+            System.out.println("\n=== Select Patient ===");
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Enter patient number (0 to cancel): ");
+            int selection = safeNextInt(null);
+            
+            if (selection == 0) {
+                return;
+            }
+            
+            if (selection < 1 || selection > patients.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            selectedPatient = patients.get(selection - 1);
+        }
+        
+        // Check if patient has vitals data
+        if (selectedPatient.getVitalsDatabase() == null || 
+            selectedPatient.getVitalsDatabase().getVitals().isEmpty()) {
+            System.out.println("No vitals data available for " + selectedPatient.getName());
+            return;
+        }
+        
+        // Menu to select which vital sign to graph
+        System.out.println("\n=== Select Vital Sign to Graph ===");
+        System.out.println("1. Heart Rate");
+        System.out.println("2. Oxygen Level");
+        System.out.println("3. Blood Pressure");
+        System.out.println("4. Temperature");
+        System.out.println("0. Cancel");
+        
+        System.out.print("Enter selection: ");
+        int vitalChoice = safeNextInt(null);
+        
+        if (vitalChoice == 0) {
+            return;
+        }
+        
+        String vitalType = "";
+        switch (vitalChoice) {
+            case 1: vitalType = "heartrate"; break;
+            case 2: vitalType = "oxygen"; break;
+            case 3: vitalType = "bloodpressure"; break;
+            case 4: vitalType = "temperature"; break;
+            default:
+                System.out.println("Invalid selection.");
+                return;
+        }
+        
+        // Display graph using visualizer
+        HealthDataVisualizer visualizer = new HealthDataVisualizer();
+        visualizer.displayVitalSignGraph(selectedPatient, vitalType);
+        
+        System.out.println("Graph window opened. Close it to return to the menu.");
+    }
+    
+    // Schedule appointment for admin
+    private static void scheduleAppointmentAdmin() {
+        System.out.println("\n=== Schedule Appointment (Admin) ===");
+        scheduleAppointmentImpl();
+    }
+    
+    // Schedule appointment for patient
+    private static void scheduleAppointmentPatient() {
+        System.out.println("\n=== Schedule Appointment ===");
+        scheduleAppointmentImpl();
+    }
+    
+    // Common appointment scheduling implementation
+    private static void scheduleAppointmentImpl() {
+        try {
+            // First, select a patient
+            Patient selectedPatient = null;
+            
+            if (currentUser instanceof Patient) {
+                selectedPatient = (Patient) currentUser;
+            } else {
+                // For admin or doctor, show list of patients
+                if (patients.isEmpty()) {
+                    System.out.println("No patients available to schedule appointments for.");
+                    return;
+                }
+                
+                System.out.println("Select patient:");
+                for (int i = 0; i < patients.size(); i++) {
+                    System.out.println((i + 1) + ". " + patients.get(i).getName());
+                }
+                
+                System.out.print("Enter patient number (0 to cancel): ");
+                int patientSelection = safeNextInt(null);
+                
+                if (patientSelection == 0) {
+                    return;
+                }
+                
+                if (patientSelection < 1 || patientSelection > patients.size()) {
+                    System.out.println("Invalid selection.");
+                    return;
+                }
+                
+                selectedPatient = patients.get(patientSelection - 1);
+            }
+            
+            // Now select a doctor
+            if (doctors.isEmpty()) {
+                System.out.println("No doctors available to schedule appointments with.");
+                return;
+            }
+            
+            System.out.println("Select doctor:");
+            for (int i = 0; i < doctors.size(); i++) {
+                System.out.println((i + 1) + ". Dr. " + doctors.get(i).getName() + 
+                                  " (" + doctors.get(i).getSpecialization() + ")");
+            }
+            
+            System.out.print("Enter doctor number (0 to cancel): ");
+            int doctorSelection = safeNextInt(null);
+            
+            if (doctorSelection == 0) {
+                return;
+            }
+            
+            if (doctorSelection < 1 || doctorSelection > doctors.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            Doctor selectedDoctor = doctors.get(doctorSelection - 1);
+            
+            // Get appointment details
+            System.out.print("Enter appointment date (YYYY-MM-DD): ");
+            String dateStr = scanner.nextLine().trim();
+            
+            System.out.print("Enter appointment time (HH:MM): ");
+            String timeStr = scanner.nextLine().trim();
+            
+            System.out.print("Enter reason for visit: ");
+            String reason = scanner.nextLine().trim();
+            
+            // Parse date string to Date object
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            Date appointmentDate = dateFormat.parse(dateStr + " " + timeStr);
+            
+            // Create appointment
+            Appointment appointment = appointmentManager.requestAppointment(appointmentDate, selectedDoctor, selectedPatient);
+            
+            System.out.println("Appointment scheduled successfully! Awaiting doctor approval.");
+            
+        } catch (ParseException e) {
+            System.out.println("Error: Invalid date or time format. Please use YYYY-MM-DD and HH:MM formats.");
+        } catch (Exception e) {
+            System.out.println("Error scheduling appointment: " + e.getMessage());
+        }
+    }
+    
+    // Show notification menu
+    private static void showNotificationMenu() {
+        System.out.println("\n=== Send Notifications ===");
+        System.out.println("1. Send SMS to Patient");
+        System.out.println("2. Send SMS to Doctor");
+        System.out.println("0. Back to Dashboard");
+        
+        System.out.print("Choose an option: ");
+        int choice = safeNextInt(null);
+        
+        switch (choice) {
+            case 1:
+                sendSMSToUser(patients);
+                break;
+            case 2:
+                sendSMSToUser(doctors);
+                break;
+            case 0:
+                return;
+            default:
+                System.out.println("Invalid option selected.");
+        }
+    }
+    
+    // Send SMS to a selected user
+    private static void sendSMSToUser(ArrayList<? extends User> users) {
+        if (users.isEmpty()) {
+            System.out.println("No users available to send notifications to.");
+            return;
+        }
+        
+        System.out.println("Select recipient:");
+        for (int i = 0; i < users.size(); i++) {
+            System.out.println((i + 1) + ". " + users.get(i).getName());
+        }
+        
+        System.out.print("Enter selection (0 to cancel): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) {
+            return;
+        }
+        
+        if (selection < 1 || selection > users.size()) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        User recipient = users.get(selection - 1);
+        
+        System.out.print("Enter message to send: ");
+        String message = scanner.nextLine().trim();
+        
+        if (recipient.getPhone() != null) {
+            smsNotification.sendNotification(recipient.getPhone(), message);
+            System.out.println("SMS notification sent to " + recipient.getName());
+        } else {
+            System.out.println("Unable to send SMS: No phone number available for " + recipient.getName());
+        }
+    }
+    
+    // Generate downloadable report
+    private static void generateReport() {
+        if (!(currentUser instanceof Patient || currentUser instanceof Doctor)) {
+            System.out.println("Error: This feature is only available for patients and doctors.");
+            return;
+        }
+        
+        Patient selectedPatient = null;
+        
+        // If current user is a patient, use their data
+        if (currentUser instanceof Patient) {
+            selectedPatient = (Patient) currentUser;
+        }
+        // If current user is a doctor, select a patient
+        else if (currentUser instanceof Doctor) {
+            System.out.println("\n=== Select Patient ===");
+            for (int i = 0; i < patients.size(); i++) {
+                System.out.println((i + 1) + ". " + patients.get(i).getName());
+            }
+            
+            System.out.print("Enter patient number (0 to cancel): ");
+            int selection = safeNextInt(null);
+            
+            if (selection == 0) {
+                return;
+            }
+            
+            if (selection < 1 || selection > patients.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            selectedPatient = patients.get(selection - 1);
+        }
+        
+        // Ask for report type
+        System.out.println("\n=== Report Options ===");
+        System.out.println("1. Basic Report (Vitals & Medical History)");
+        System.out.println("2. Comprehensive Report (with Analytics)");
+        System.out.println("0. Cancel");
+        
+        System.out.print("Enter selection: ");
+        int reportType = safeNextInt(null);
+        
+        if (reportType == 0) {
+            return;
+        }
+        
+        if (reportType != 1 && reportType != 2) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        // Generate the report
+        ReportsGenerator generator = new ReportsGenerator();
+        boolean includeAnalytics = (reportType == 2);
+        
+        String reportPath = generator.generatePatientReport(selectedPatient, includeAnalytics);
+        
+        if (reportPath != null) {
+            System.out.println("Report generated successfully: " + reportPath);
+            System.out.println("The report file is available in the application directory.");
         }
     }
 }
