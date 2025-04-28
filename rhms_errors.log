@@ -1,0 +1,42 @@
+Apr 27, 2025 11:44:49 AM com.rhms.exceptions.ErrorHandler handleException
+SEVERE: Error 2003: Invalid email or password.
+Timestamp: 2025-04-27T11:44:49.659171500
+User action: User login attempt
+Suggested solution: Check credentials and try again
+
+Apr 27, 2025 12:04:21 PM com.rhms.exceptions.ErrorHandler handleGeneralException
+SEVERE: Error 4001: Unexpected error: For input string: ""
+Timestamp: 2025-04-27T12:04:21.722225400
+User action: System operation
+Suggested solution: Check network connectivity and try again
+
+java.lang.NumberFormatException: For input string: ""
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Integer.parseInt(Integer.java:565)
+	at java.base/java.lang.Integer.parseInt(Integer.java:685)
+	at com.rhms.TESTAPP.main(TESTAPP.java:52)
+
+Apr 27, 2025 12:04:55 PM com.rhms.exceptions.ErrorHandler handleException
+SEVERE: Error 2003: Invalid email or password.
+Timestamp: 2025-04-27T12:04:55.694769700
+User action: User login attempt
+Suggested solution: Check credentials and try again
+
+Apr 27, 2025 12:06:43 PM com.rhms.exceptions.ErrorHandler handleException
+SEVERE: Error 2003: Invalid email or password.
+Timestamp: 2025-04-27T12:06:43.626478400
+User action: User login attempt
+Suggested solution: Check credentials and try again
+
+Apr 27, 2025 12:07:05 PM com.rhms.exceptions.ErrorHandler handleException
+SEVERE: Error 2003: Invalid email or password.
+Timestamp: 2025-04-27T12:07:05.295052
+User action: User login attempt
+Suggested solution: Check credentials and try again
+
+Apr 27, 2025 12:15:00 PM com.rhms.exceptions.ErrorHandler handleException
+SEVERE: Error 2003: Invalid email or password.
+Timestamp: 2025-04-27T12:15:00.049667700
+User action: User login attempt
+Suggested solution: Check credentials and try again
+

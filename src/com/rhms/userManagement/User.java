@@ -33,4 +33,21 @@ public class User{
     public String getPhone() {
         return phone;
     }
+
+    public String getPassword() {
+        return password;
+    }
+    
+    public int getUserID() {
+        return userID;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        
+        User user = (User) obj;
+        return userID == user.userID;
+    }
 }
