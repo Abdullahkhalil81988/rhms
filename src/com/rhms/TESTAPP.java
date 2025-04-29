@@ -35,9 +35,8 @@ public class TESTAPP {
     private static boolean isLoggedIn = false; // Track login status
     private static ChatServer chatServer = new ChatServer();
     private static SMSNotification smsNotification = new SMSNotification();
-    // Remove unused fields
-    // private static ReminderService reminderService;
-    // private static EmailNotification emailNotification;
+    // Add this with other field declarations
+    private static EmailNotification emailNotification = new EmailNotification();
 
     public static void main(String[] args) {
         // Initialize demo data
@@ -234,6 +233,7 @@ public class TESTAPP {
         System.out.println("12. Join Video Consultation");
         System.out.println("13. Open Chat");
         System.out.println("14. Logout");
+        System.out.println("15. Email My Doctor");               // New option
         System.out.println("0. Exit System");
         System.out.print("Choose an option: ");
         
@@ -254,6 +254,7 @@ public class TESTAPP {
             case 12: joinVideoConsultation(); break;
             case 13: openChat(); break;
             case 14: performLogout(); break;
+            case 15: emailMyDoctor(); break;             // New feature
             case 0: 
                 System.out.println("Exiting RHMS System. Goodbye!");
                 System.exit(0);
@@ -1353,6 +1354,9 @@ public class TESTAPP {
         System.out.println("\n=== Send Notifications ===");
         System.out.println("1. Send SMS to Patient");
         System.out.println("2. Send SMS to Doctor");
+        System.out.println("3. Send Email to Patient");    // New option
+        System.out.println("4. Send Email to Doctor");     // New option
+        System.out.println("5. Send Bulk Email");          // New option
         System.out.println("0. Back to Dashboard");
         
         System.out.print("Choose an option: ");
@@ -1364,6 +1368,15 @@ public class TESTAPP {
                 break;
             case 2:
                 sendSMSToUser(doctors);
+                break;
+            case 3:
+                sendEmailToUser(patients);
+                break;
+            case 4:
+                sendEmailToUser(doctors);
+                break;
+            case 5:
+                sendBulkEmail();
                 break;
             case 0:
                 return;
@@ -1407,6 +1420,126 @@ public class TESTAPP {
         } else {
             System.out.println("Unable to send SMS: No phone number available for " + recipient.getName());
         }
+    }
+    
+    private static void sendEmailToUser(ArrayList<? extends User> users) {
+        if (users.isEmpty()) {
+            System.out.println("No users available to send emails to.");
+            return;
+        }
+        
+        System.out.println("Select recipient:");
+        for (int i = 0; i < users.size(); i++) {
+            System.out.println((i + 1) + ". " + users.get(i).getName() + 
+                              " (" + users.get(i).getEmail() + ")");
+        }
+        
+        System.out.print("Enter selection (0 to cancel): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) return;
+        
+        if (selection < 1 || selection > users.size()) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        User recipient = users.get(selection - 1);
+        
+        System.out.print("Enter email subject: ");
+        String subject = scanner.nextLine().trim();
+        
+        System.out.println("Enter email message (type END on a new line to finish):");
+        StringBuilder message = new StringBuilder();
+        String line;
+        while (!(line = scanner.nextLine()).equals("END")) {
+            message.append(line).append("\n");
+        }
+        
+        if (recipient.getEmail() != null && !recipient.getEmail().isEmpty()) {
+            emailNotification.sendNotification(recipient.getEmail(), subject, message.toString());
+            System.out.println("Email sent successfully to " + recipient.getName());
+        } else {
+            System.out.println("Unable to send email: No valid email address for " + recipient.getName());
+        }
+    }
+    
+    private static void sendBulkEmail() {
+        System.out.println("\n=== Send Bulk Email ===");
+        System.out.println("1. All Patients");
+        System.out.println("2. All Doctors");
+        System.out.println("3. All Users");
+        System.out.println("0. Cancel");
+        
+        System.out.print("Select recipient group: ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) return;
+        
+        System.out.print("Enter email subject: ");
+        String subject = scanner.nextLine().trim();
+        
+        System.out.println("Enter email message (type END on a new line to finish):");
+        StringBuilder message = new StringBuilder();
+        String line;
+        while (!(line = scanner.nextLine()).equals("END")) {
+            message.append(line).append("\n");
+        }
+        
+        String emailContent = "Subject: " + subject + "\n\n" + message.toString();
+        int sentCount = 0;
+        
+        switch (selection) {
+            case 1: // All Patients
+                for (Patient patient : patients) {
+                    if (sendEmailToRecipient(patient, emailContent)) sentCount++;
+                }
+                break;
+            case 2: // All Doctors
+                for (Doctor doctor : doctors) {
+                    if (sendEmailToRecipient(doctor, emailContent)) sentCount++;
+                }
+                break;
+            case 3: // All Users
+                for (User user : getAllUsers()) {
+                    if (sendEmailToRecipient(user, emailContent)) sentCount++;
+                }
+                break;
+            default:
+                System.out.println("Invalid selection.");
+                return;
+        }
+        
+        System.out.println("Bulk email sent to " + sentCount + " recipients.");
+    }
+    
+    private static boolean sendEmailToRecipient(User user, String content) {
+        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+            // Parse content to extract subject and message
+            String subject = "";
+            String message = content;
+            
+            // Check if content contains a subject line
+            if (content.startsWith("Subject:")) {
+                int endOfSubject = content.indexOf("\n\n");
+                if (endOfSubject != -1) {
+                    subject = content.substring("Subject:".length(), endOfSubject).trim();
+                    message = content.substring(endOfSubject + 2);
+                }
+            }
+            
+            emailNotification.sendNotification(user.getEmail(), subject, message);
+            return true;
+        }
+        return false;
+    }
+    
+    private static ArrayList<User> getAllUsers() {
+        ArrayList<User> allUsers = new ArrayList<>();
+        allUsers.addAll(patients);
+        allUsers.addAll(doctors);
+        allUsers.addAll(administrators);
+        return allUsers;
     }
     
     // Generate downloadable report
@@ -1471,6 +1604,64 @@ public class TESTAPP {
         if (reportPath != null) {
             System.out.println("Report generated successfully: " + reportPath);
             System.out.println("The report file is available in the application directory.");
+        }
+    }
+
+    // Email my doctor feature
+    private static void emailMyDoctor() {
+        if (!(currentUser instanceof Patient)) {
+            System.out.println("This feature is only available for patients.");
+            return;
+        }
+        
+        Patient patient = (Patient) currentUser;
+        
+        System.out.println("\n=== Email Your Doctor ===");
+        
+        if (doctors.isEmpty()) {
+            System.out.println("No doctors available to email.");
+            return;
+        }
+        
+        // Show available doctors
+        for (int i = 0; i < doctors.size(); i++) {
+            System.out.println((i + 1) + ". Dr. " + doctors.get(i).getName() + 
+                              " (" + doctors.get(i).getSpecialization() + ")");
+        }
+        
+        System.out.print("Select doctor (0 to cancel): ");
+        int selection = safeNextInt(null);
+        
+        if (selection == 0) return;
+        if (selection < 1 || selection > doctors.size()) {
+            System.out.println("Invalid selection.");
+            return;
+        }
+        
+        Doctor selectedDoctor = doctors.get(selection - 1);
+        
+        System.out.print("Enter email subject: ");
+        String subject = scanner.nextLine().trim();
+        
+        System.out.println("Enter your message (type END on a new line to finish):");
+        StringBuilder message = new StringBuilder();
+        String line;
+        while (!(line = scanner.nextLine()).equals("END")) {
+            message.append(line).append("\n");
+        }
+        
+        // Add patient details footer
+        message.append("\n-------------------\n");
+        message.append("From Patient: ").append(patient.getName())
+              .append(" (ID: ").append(patient.getUserID()).append(")\n");
+        message.append("Contact: ").append(patient.getPhone());
+        
+        // Send email notification
+        try {
+            emailNotification.sendNotification(selectedDoctor.getEmail(), subject, message.toString());
+            System.out.println("Email sent successfully to Dr. " + selectedDoctor.getName());
+        } catch (Exception e) {
+            System.out.println("Failed to send email: " + e.getMessage());
         }
     }
 }
