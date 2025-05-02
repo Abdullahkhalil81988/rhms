@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.rhms.gui.controllers.PatientDashboardController"
+           stylesheets="/css/styles.css">
+    <top>
+        <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: #2196F3; -fx-padding: 10px;">
+            <Label text="Patient Dashboard" textFill="WHITE">
+                <font>
+                    <Font name="System Bold" size="18.0"/>
+                </font>
+            </Label>
+            <Pane HBox.hgrow="ALWAYS" />
+            <Label fx:id="userNameLabel" text="Welcome, Patient" textFill="WHITE"/>
+            <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout"/>
+        </HBox>
+    </top>
+    
+    <left>
+        <VBox prefWidth="200" spacing="10" style="-fx-background-color: #f0f0f0; -fx-padding: 10px;">
+            <Button text="My Appointments" maxWidth="Infinity" onAction="#handleViewAppointments"/>
+            <Button text="Book Appointment" maxWidth="Infinity" onAction="#handleBookAppointment"/>
+            <Button text="My Health Data" maxWidth="Infinity" onAction="#handleViewHealthData"/>
+            <Button text="Health Trends" maxWidth="Infinity" onAction="#handleViewHealthTrends"/>
+            <Button text="Medical History" maxWidth="Infinity" onAction="#handleViewMedicalHistory"/>
+            <Button text="Chat with Doctor" maxWidth="Infinity" onAction="#handleChatWithDoctor"/>
+            <Button text="Emergency Assistance" maxWidth="Infinity" onAction="#handleEmergencyAssistance"
+                    style="-fx-background-color: #f44336; -fx-text-fill: white;"/>
+        </VBox>
+    </left>
+    
+    <center>
+        <StackPane fx:id="contentArea">
+            <VBox alignment="CENTER" spacing="20">
+                <Label text="Welcome to the Patient Dashboard" style="-fx-font-size: 20px;"/>
+                <Label text="Select an option from the menu to get started" style="-fx-font-size: 14px;"/>
+            </VBox>
+        </StackPane>
+    </center>
+</BorderPane>

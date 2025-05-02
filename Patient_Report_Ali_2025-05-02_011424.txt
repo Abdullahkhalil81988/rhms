@@ -1,0 +1,23 @@
+=================================================
+           PATIENT HEALTH REPORT                 
+=================================================
+Patient: Ali
+ID: 3001
+Date Generated: Fri May 02 01:14:24 PKT 2025
+=================================================
+
+VITALS HISTORY
+-------------------------------------------------
+No vitals records available.
+
+MEDICAL HISTORY & DOCTOR FEEDBACK
+-------------------------------------------------
+No medical history records available.
+
+HEALTH TRENDS & ANALYTICS
+-------------------------------------------------
+Not enough vitals data for analysis
+
+=================================================
+End of Report
+=================================================
