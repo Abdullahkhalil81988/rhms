@@ -396,6 +396,56 @@ public class DataPersistenceManager {
     }
 
     /**
+     * Save the current system state
+     * @param patients List of patients
+     * @param doctors List of doctors
+     * @param admins List of administrators
+     * @param appointments List of appointments
+     * @return true if saving was successful
+     */
+    public static boolean saveSystemState(ArrayList<Patient> patients, ArrayList<Doctor> doctors, 
+                                         ArrayList<Administrator> admins, ArrayList<Appointment> appointments) {
+        try {
+            // Save all data through the existing method
+            boolean result = saveAllData(patients, doctors, admins, appointments);
+            
+            if (result) {
+                System.out.println("System state saved successfully");
+            } else {
+                System.err.println("Error occurred while saving system state");
+            }
+            return result;
+        } catch (Exception e) {
+            System.err.println("Error saving system state: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Save the current system state using data from the SessionManager
+     * @return true if saving was successful
+     */
+    public static boolean saveSystemState() {
+        try {
+            // Get all the required data from SessionManager
+            ArrayList<Patient> patients = com.rhms.gui.SessionManager.getPatients();
+            ArrayList<Doctor> doctors = com.rhms.gui.SessionManager.getDoctors();
+            
+            // Create empty lists for admins and appointments if SessionManager doesn't have these methods
+            ArrayList<Administrator> admins = new ArrayList<>();
+            ArrayList<Appointment> appointments = new ArrayList<>();
+            
+            // Call the existing method with all required parameters
+            return saveSystemState(patients, doctors, admins, appointments);
+        } catch (Exception e) {
+            System.err.println("Error in saveSystemState(): " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Serializable class to store appointment data without direct references to objects
      */
     private static class SerializableAppointment implements Serializable {

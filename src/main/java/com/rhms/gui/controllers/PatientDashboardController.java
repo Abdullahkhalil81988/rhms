@@ -1,5 +1,6 @@
 package com.rhms.gui.controllers;
 
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -39,10 +40,12 @@ import com.rhms.notifications.EmailNotification;
 import com.rhms.reporting.ReportsGenerator;
 import com.rhms.userManagement.Doctor;
 import com.rhms.userManagement.Patient;
+import com.rhms.persistence.DataPersistenceManager;
 
 public class PatientDashboardController {
     @FXML private Label userNameLabel;
     @FXML private StackPane contentArea;
+    @FXML private VBox navigationVBox;
     
     private Patient currentPatient;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -57,12 +60,31 @@ public class PatientDashboardController {
             
             // Initialize vitals database if needed
             if (currentPatient.getVitalsDatabase() == null) {
+                System.out.println("Creating new vitals database for patient");
                 currentPatient.setVitalsDatabase(new VitalsDatabase(currentPatient));
+            } else {
+                VitalsDatabase db = currentPatient.getVitalsDatabase();
+                int vitalCount = db.getVitals().size();
+                System.out.println("Using existing vitals database with " + vitalCount + " records");
+                
+                // Print some sample vitals if available
+                if (vitalCount > 0) {
+                    System.out.println("Sample vital record: " + 
+                        db.getVitals().get(0).getHeartRate() + "bpm, " +
+                        db.getVitals().get(0).getOxygenLevel() + "%, " +
+                        db.getVitals().get(0).getBloodPressure() + "mmHg, " +
+                        db.getVitals().get(0).getTemperature() + "°C");
+                }
             }
             
             // Initialize medical history if needed
             if (currentPatient.getMedicalHistory() == null) {
                 currentPatient.setMedicalHistory(new MedicalHistory());
+            }
+            
+            // Initialize panic button if needed
+            if (currentPatient.getPanicButton() == null) {
+                currentPatient.setPanicButton(new PanicButton(currentPatient));
             }
         }
     }
@@ -108,7 +130,10 @@ public class PatientDashboardController {
         });
         statusColumn.setPrefWidth(100);
         
-        appointmentTable.getColumns().addAll(dateColumn, doctorColumn, statusColumn);
+        // Add columns individually to avoid type safety warning
+        appointmentTable.getColumns().add(dateColumn);
+        appointmentTable.getColumns().add(doctorColumn);
+        appointmentTable.getColumns().add(statusColumn);
         appointmentTable.setPrefHeight(300);
         
         // Add data to table
@@ -300,6 +325,7 @@ public class PatientDashboardController {
         }
         
         ArrayList<VitalSign> vitals = vitalsDB.getVitals();
+        System.out.println("Vitals size in handleViewHealthData: " + vitals.size());
         
         // Create table for vitals
         TableView<VitalSign> vitalsTable = new TableView<>();
@@ -329,10 +355,22 @@ public class PatientDashboardController {
                     cellData.getValue().getTemperature());
         });
         
-        vitalsTable.getColumns().addAll(heartRateColumn, oxygenColumn, bpColumn, tempColumn);
+        // Add columns individually to avoid the type safety warning
+        vitalsTable.getColumns().add(heartRateColumn);
+        vitalsTable.getColumns().add(oxygenColumn);
+        vitalsTable.getColumns().add(bpColumn);
+        vitalsTable.getColumns().add(tempColumn);
         
-        // Set equal width for columns
-        vitalsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        // Set equal width for columns using non-deprecated method
+        vitalsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        vitalsTable.setMinWidth(Region.USE_COMPUTED_SIZE);
+        Platform.runLater(() -> {
+            double tableWidth = vitalsTable.getWidth();
+            double columnWidth = tableWidth / vitalsTable.getColumns().size();
+            for (TableColumn<VitalSign, ?> column : vitalsTable.getColumns()) {
+                column.setPrefWidth(columnWidth);
+            }
+        });
         
         // Add data to table
         ObservableList<VitalSign> vitalsData = FXCollections.observableArrayList(vitals);
@@ -435,32 +473,151 @@ public class PatientDashboardController {
         
         if (selectedFile != null) {
             try {
+                System.out.println("Processing CSV file: " + selectedFile.getAbsolutePath());
+                
+                // Get vitals database
+                final VitalsDatabase vitalsDB;
+                if (currentPatient.getVitalsDatabase() == null) {
+                    System.out.println("Creating new vitals database for patient");
+                    vitalsDB = new VitalsDatabase(currentPatient);
+                    currentPatient.setVitalsDatabase(vitalsDB);
+                } else {
+                    vitalsDB = currentPatient.getVitalsDatabase();
+                }
+                
+                // Process CSV file using a try-with-resources approach for safe file handling
+                System.out.println("Starting CSV processing...");
                 CSVVitalsProcessor processor = new CSVVitalsProcessor();
-                ArrayList<VitalSign> newVitals = processor.processCSVFile(selectedFile.getAbsolutePath());
+                ArrayList<VitalSign> importedVitals = processor.processCSVFile(selectedFile.getAbsolutePath());
                 
-                if (newVitals.isEmpty()) {
-                    showAlert(Alert.AlertType.WARNING, "No Data Found", 
-                            "No valid vital sign records found in the CSV file.");
-                    return;
+                if (importedVitals != null && !importedVitals.isEmpty()) {
+                    System.out.println("Successfully imported " + importedVitals.size() + " vitals");
+                    
+                    // Add each vital sign to the database
+                    for (VitalSign vital : importedVitals) {
+                        vitalsDB.addVitalRecord(vital);
+                    }
+                    
+                    // Update patient's vitals database
+                    currentPatient.setVitalsDatabase(vitalsDB);
+                    
+                    // Find the patient in the patients list and update it
+                    ArrayList<Patient> patients = SessionManager.getPatients();
+                    for (int i = 0; i < patients.size(); i++) {
+                        if (patients.get(i).getUserID() == currentPatient.getUserID()) {
+                            System.out.println("Updating patient in session list with ID: " + currentPatient.getUserID());
+                            
+                            // Critical: ensure the patient's vitals database is properly set
+                            VitalsDatabase db = currentPatient.getVitalsDatabase();
+                            if (db != null) {
+                                db.setPatient(currentPatient);
+                                System.out.println("Verified vitals database has proper patient reference");
+                            }
+                            
+                            patients.set(i, currentPatient);
+                            break;
+                        }
+                    }
+                    
+                    // Call SessionManager's saveData method for reliable saving
+                    try {
+                        System.out.println("Attempting to save data after vitals update...");
+                        SessionManager.saveData();
+                        System.out.println("Data saved successfully through SessionManager");
+                    } catch (Exception ex) {
+                        System.err.println("Error during save: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                    
+                    // Force refresh UI on JavaFX thread
+                    Platform.runLater(() -> {
+                        // Clear content area first
+                        contentArea.getChildren().clear();
+                        
+                        // Then rebuild the health data view with refreshed data
+                        VBox vitalsView = new VBox(15);
+                        vitalsView.setPadding(new Insets(20));
+                        vitalsView.setAlignment(Pos.TOP_CENTER);
+                        
+                        Label headerLabel = new Label("My Health Data");
+                        headerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+                        
+                        // Get fresh vitals data
+                        ArrayList<VitalSign> refreshedVitals = vitalsDB.getVitals();
+                        System.out.println("Display refreshed vitals: " + refreshedVitals.size());
+                        
+                        // Create table and populate it
+                        TableView<VitalSign> vitalsTable = createVitalsTable(refreshedVitals);
+                        
+                        Button addVitalButton = new Button("Add New Vital Signs");
+                        addVitalButton.setOnAction(e -> {
+                            // Your existing code for adding vitals
+                            Dialog<VitalSign> dialog = new Dialog<>();
+                            dialog.setTitle("Add Vital Signs");
+                            // ... existing code ...
+                        });
+                        
+                        Button uploadCSVButton = new Button("Upload Vitals from CSV");
+                        uploadCSVButton.setOnAction(evt -> handleUploadVitalsFromCSV());
+                        
+                        HBox buttonBox = new HBox(10);
+                        buttonBox.setAlignment(Pos.CENTER);
+                        buttonBox.getChildren().addAll(addVitalButton, uploadCSVButton);
+                        
+                        vitalsView.getChildren().addAll(headerLabel, vitalsTable, buttonBox);
+                        contentArea.getChildren().add(vitalsView);
+                    });
+                    
+                    showAlert(Alert.AlertType.INFORMATION, "Upload Successful", 
+                             "Successfully imported " + importedVitals.size() + " vital records.");
+                } else {
+                    showAlert(Alert.AlertType.WARNING, "Empty Data", 
+                             "No valid vital signs data found in the selected CSV file.");
                 }
-                
-                // Add all new vitals to the database
-                VitalsDatabase vitalsDB = currentPatient.getVitalsDatabase();
-                for (VitalSign vital : newVitals) {
-                    vitalsDB.addVitalRecord(vital);
-                }
-                
-                showAlert(Alert.AlertType.INFORMATION, "Upload Successful", 
-                        newVitals.size() + " vital records successfully imported.");
-                
-                // Refresh the view
-                handleViewHealthData(null);
-                
-            } catch (IOException ex) {
-                showAlert(Alert.AlertType.ERROR, "Error", 
-                        "Error reading CSV file: " + ex.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Upload Failed", 
+                         "Failed to process CSV file: " + e.getMessage());
             }
         }
+    }
+    
+    // Helper method to create a vitals table
+    private TableView<VitalSign> createVitalsTable(ArrayList<VitalSign> vitals) {
+        TableView<VitalSign> vitalsTable = new TableView<>();
+        
+        // Create columns
+        TableColumn<VitalSign, Number> heartRateColumn = new TableColumn<>("Heart Rate (bpm)");
+        heartRateColumn.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getHeartRate()));
+        
+        TableColumn<VitalSign, Number> oxygenColumn = new TableColumn<>("Oxygen Level (%)");
+        oxygenColumn.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getOxygenLevel()));
+        
+        TableColumn<VitalSign, Number> bpColumn = new TableColumn<>("Blood Pressure (mmHg)");
+        bpColumn.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getBloodPressure()));
+        
+        TableColumn<VitalSign, Number> tempColumn = new TableColumn<>("Temperature (°C)");
+        tempColumn.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getTemperature()));
+        
+        // Add columns
+        vitalsTable.getColumns().add(heartRateColumn);
+        vitalsTable.getColumns().add(oxygenColumn);
+        vitalsTable.getColumns().add(bpColumn);
+        vitalsTable.getColumns().add(tempColumn);
+        
+        // Set data
+        ObservableList<VitalSign> vitalsData = FXCollections.observableArrayList(vitals);
+        vitalsTable.setItems(vitalsData);
+        vitalsTable.setPrefHeight(300);
+        
+        // Add placeholder
+        vitalsTable.setPlaceholder(new Label("No health data records available"));
+        
+        return vitalsTable;
     }
     
     @FXML
@@ -770,7 +927,10 @@ public class PatientDashboardController {
             new javafx.beans.property.SimpleStringProperty(cellData.getValue().getPhone()));
         phoneColumn.setPrefWidth(120);
         
-        contactsTable.getColumns().addAll(nameColumn, relationColumn, phoneColumn);
+        // Add columns individually to avoid type safety warning
+        contactsTable.getColumns().add(nameColumn);
+        contactsTable.getColumns().add(relationColumn);
+        contactsTable.getColumns().add(phoneColumn);
         contactsTable.setPrefHeight(150);
         
         // Add sample data
@@ -889,25 +1049,27 @@ public class PatientDashboardController {
     @FXML
     private void handleLogout(ActionEvent event) {
         try {
-            // Log out user
-            SessionManager.logout();
+            // Make sure to save data before logging out
+            SessionManager.saveData();
             
-            // Return to login screen
+            // Load the login view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/login.fxml"));
             Parent root = loader.load();
             
             // Get current stage
-            Stage stage = (Stage) userNameLabel.getScene().getWindow();
+            Stage stage = (Stage) contentArea.getScene().getWindow();
             
-            // Set the login scene
+            // Set the new scene
             stage.setScene(new Scene(root, 800, 600));
             stage.setTitle("RHMS - Login");
             stage.setResizable(false);
             stage.centerOnScreen();
             
+            // Now logout the user after UI is updated
+            SessionManager.logout();
         } catch (Exception e) {
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "Error logging out: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Error", "Could not log out: " + e.getMessage());
         }
     }
     
@@ -1174,6 +1336,114 @@ public class PatientDashboardController {
             showAlert(Alert.AlertType.INFORMATION, "Email Sent", 
                      "Your health data has been emailed to Dr. " + doctor.getName());
         });
+    }
+    
+    @FXML
+    private void handleVideoConsultation(ActionEvent event) {
+        contentArea.getChildren().clear();
+        
+        VBox videoConsultView = new VBox(15);
+        videoConsultView.setPadding(new Insets(20));
+        videoConsultView.setAlignment(Pos.TOP_CENTER);
+        
+        Label headerLabel = new Label("Video Consultation");
+        headerLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        
+        // Create a card-like container for the video call section
+        VBox videoCallCard = new VBox(15);
+        videoCallCard.setStyle("-fx-background-color: white; -fx-padding: 20px; " +
+                              "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 3); " +
+                              "-fx-background-radius: 5px;");
+        videoCallCard.setAlignment(Pos.CENTER);
+        
+        Label instructionsLabel = new Label("Enter the meeting ID provided by your doctor to join a video consultation");
+        instructionsLabel.setStyle("-fx-font-style: italic; -fx-text-fill: #6c757d;");
+        
+        HBox meetingIdBox = new HBox(10);
+        meetingIdBox.setAlignment(Pos.CENTER);
+        
+        TextField meetingIdField = new TextField();
+        meetingIdField.setPromptText("Enter meeting ID");
+        meetingIdField.setPrefWidth(250);
+        
+        Button joinButton = new Button("Join Consultation");
+        joinButton.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-weight: bold; " +
+                           "-fx-padding: 10px 20px; -fx-border-radius: 5px;");
+        
+        meetingIdBox.getChildren().addAll(meetingIdField, joinButton);
+        
+        // List of scheduled video consultations from approved appointments
+        VBox scheduledConsultationsBox = new VBox(10);
+        
+        Label scheduledLabel = new Label("Scheduled Video Consultations");
+        scheduledLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        ListView<String> consultationListView = new ListView<>();
+        consultationListView.setPrefHeight(200);
+        
+        // Get approved appointments
+        ArrayList<Appointment> approvedAppointments = new ArrayList<>();
+        for (Appointment appointment : SessionManager.getAppointmentManager().getPatientAppointments(currentPatient)) {
+            if (appointment.getStatus().equals("Approved")) {
+                approvedAppointments.add(appointment);
+            }
+        }
+        
+        // Add appointments to list view
+        if (approvedAppointments.isEmpty()) {
+            consultationListView.setPlaceholder(new Label("No scheduled video consultations"));
+        } else {
+            ObservableList<String> appointmentItems = FXCollections.observableArrayList();
+            for (Appointment appointment : approvedAppointments) {
+                appointmentItems.add(String.format("Dr. %s - %s", 
+                                                  appointment.getDoctor().getName(),
+                                                  dateFormat.format(appointment.getAppointmentDate())));
+            }
+            consultationListView.setItems(appointmentItems);
+        }
+        
+        scheduledConsultationsBox.getChildren().addAll(scheduledLabel, consultationListView);
+        
+        // Add tips for good video experience
+        TitledPane tipsTitledPane = new TitledPane();
+        tipsTitledPane.setText("Tips for a Good Video Consultation Experience");
+        
+        VBox tipsBox = new VBox(5);
+        tipsBox.setPadding(new Insets(10));
+        
+        tipsBox.getChildren().addAll(
+            new Label("• Ensure you have a stable internet connection"),
+            new Label("• Use a quiet, well-lit space for your consultation"),
+            new Label("• Test your camera and microphone before joining"),
+            new Label("• Have any relevant medical documents ready"),
+            new Label("• Prepare a list of questions or concerns to discuss")
+        );
+        
+        tipsTitledPane.setContent(tipsBox);
+        
+        // Join button action
+        joinButton.setOnAction(e -> {
+            String meetingId = meetingIdField.getText().trim();
+            if (meetingId.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Missing Information", 
+                         "Please enter a meeting ID to join the consultation.");
+                return;
+            }
+            
+            try {
+                VideoCall.joinVideoCall(meetingId);
+                showAlert(Alert.AlertType.INFORMATION, "Joining Video Call", 
+                         "Connecting to video consultation with ID: " + meetingId);
+            } catch (Exception ex) {
+                showAlert(Alert.AlertType.ERROR, "Error", 
+                         "Failed to join video call: " + ex.getMessage());
+            }
+        });
+        
+        videoCallCard.getChildren().addAll(instructionsLabel, meetingIdBox);
+        
+        videoConsultView.getChildren().addAll(headerLabel, videoCallCard, scheduledConsultationsBox, tipsTitledPane);
+        contentArea.getChildren().add(videoConsultView);
     }
     
     private void showAlert(Alert.AlertType type, String title, String content) {

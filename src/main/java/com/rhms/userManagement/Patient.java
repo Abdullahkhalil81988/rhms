@@ -1,6 +1,7 @@
 package com.rhms.userManagement;
 
 import java.io.Serializable;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import com.rhms.doctorPatientInteraction.MedicalHistory;
@@ -43,7 +44,15 @@ public class Patient extends User implements Serializable {
     }
     
     public MedicalHistory getMedicalHistory() {
+        // Initialize if needed
+        if (medicalHistory == null) {
+            medicalHistory = new MedicalHistory();
+        }
         return medicalHistory;
+    }
+    
+    public void setMedicalHistory(MedicalHistory medicalHistory) {
+        this.medicalHistory = medicalHistory;
     }
     
     public PanicButton getPanicButton() {
@@ -54,21 +63,17 @@ public class Patient extends User implements Serializable {
         this.panicButton = panicButton;
     }
     
-    // Add or modify method
     public VitalsDatabase getVitalsDatabase() {
-        VitalsDatabase db = new VitalsDatabase(this);
-        // Add all vital signs to the database
-        for (VitalSign vs : this.vitalSigns) {
-            db.addVitalRecord(vs);
-        }
-        return db;
+        return vitalsDatabase;
     }
 
-    /**
-     * Sets the vitals database for this patient
-     */
     public void setVitalsDatabase(VitalsDatabase vitalsDatabase) {
         this.vitalsDatabase = vitalsDatabase;
+        
+        // Ensure the database has a reference back to this patient
+        if (vitalsDatabase != null) {
+            vitalsDatabase.setPatient(this);
+        }
     }
 
     /**
@@ -108,11 +113,17 @@ public class Patient extends User implements Serializable {
         this.medicalHistory = medicalHistory;
     }
 
-    /**
-     * Alternative method name for setting medical history
-     */
-    public void setMedicalHistory(MedicalHistory medicalHistory) {
-        this.medicalHistory = medicalHistory;
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        
+        // After loading, make sure vitals database has proper reference back to patient
+        if (vitalsDatabase != null) {
+            vitalsDatabase.setPatient(this);
+        }
     }
 }
 

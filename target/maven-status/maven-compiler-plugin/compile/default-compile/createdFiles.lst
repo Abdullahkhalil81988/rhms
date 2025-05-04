@@ -1,6 +1,5 @@
 com\rhms\healthDataHandling\VitalsDatabase.class
 com\rhms\gui\controllers\AdminDashboardController$2.class
-com\rhms\gui\controllers\AdminDashboardController$SystemActivity.class
 com\rhms\gui\controllers\PatientDashboardController$2.class
 com\rhms\healthDataHandling\VitalSign.class
 com\rhms\gui\controllers\PatientDashboardController$6.class
@@ -9,19 +8,17 @@ com\rhms\notifications\EmailNotification.class
 com\rhms\gui\controllers\AdminDashboardController$6.class
 com\rhms\userManagement\User.class
 com\rhms\appointmentScheduling\AppointmentManager.class
-com\rhms\gui\controllers\LoginController.class
-com\rhms\gui\RHMSApplication.class
 com\rhms\emergencyAlert\PanicButton.class
 com\rhms\gui\controllers\DoctorDashboardController$2.class
 com\rhms\gui\controllers\PatientDashboardController$3.class
 com\rhms\analytics\AnalyticsResult.class
 com\rhms\emergencyAlert\EmergencyAlert.class
 com\rhms\gui\util\ChartGenerator.class
-com\rhms\gui\controllers\DoctorDashboardController.class
 com\rhms\exceptions\RHMSException.class
 com\rhms\gui\controllers\DoctorDashboardController$4.class
 com\rhms\analytics\HealthDataVisualizer.class
 com\rhms\gui\controllers\AdminDashboardController$3.class
+com\rhms\notifications\EmailNotification$3.class
 com\rhms\doctorPatientInteraction\MedicalHistory.class
 com\rhms\userManagement\Doctor.class
 com\rhms\healthDataHandling\CSVVitalsProcessor.class
@@ -34,9 +31,7 @@ com\rhms\notifications\SMSNotification.class
 com\rhms\gui\controllers\AdminDashboardController$7.class
 com\rhms\userManagement\Administrator.class
 com\rhms\notifications\EmailNotification$2.class
-com\rhms\gui\controllers\AdminDashboardController.class
 com\rhms\TESTAPP.class
-com\rhms\gui\SessionManager.class
 com\rhms\notifications\Notifiable.class
 com\rhms\analytics\ChartGenerator.class
 com\rhms\gui\controllers\PatientDashboardController$1.class
@@ -45,12 +40,10 @@ com\rhms\userManagement\Patient.class
 com\rhms\gui\controllers\AdminDashboardController$4.class
 com\rhms\gui\controllers\PatientDashboardController$7.class
 com\rhms\doctorPatientInteraction\Feedback.class
-com\rhms\gui\controllers\AdminDashboardController$EmergencyAlertData.class
 com\rhms\notifications\ReminderService$2.class
 com\rhms\analytics\HealthAnalytics.class
 com\rhms\userManagement\UserIDManager.class
 com\rhms\gui\controllers\AdminDashboardController$1.class
-com\rhms\gui\controllers\PatientDashboardController.class
 com\rhms\notifications\EmailNotification$1.class
 com\rhms\doctorPatientInteraction\VideoCall.class
 com\rhms\emergencyAlert\NotificationService.class
@@ -67,6 +60,4 @@ com\rhms\notifications\ReminderService$1.class
 com\rhms\persistence\DataPersistenceManager$SerializableAppointment.class
 com\rhms\gui\controllers\DoctorDashboardController$3.class
 com\rhms\gui\controllers\DoctorDashboardController$6.class
-com\rhms\gui\controllers\PatientDashboardController$EmergencyContact.class
 com\rhms\persistence\DataPersistenceManager$UserIDCounter.class
-com\rhms\gui\controllers\AdminDashboardController$UserActivity.class

@@ -29,6 +29,7 @@
             <Button text="Health Trends" maxWidth="Infinity" onAction="#handleViewHealthTrends"/>
             <Button text="Medical History" maxWidth="Infinity" onAction="#handleViewMedicalHistory"/>
             <Button text="Chat with Doctor" maxWidth="Infinity" onAction="#handleChatWithDoctor"/>
+            <Button text="Video Consultation" maxWidth="Infinity" onAction="#handleVideoConsultation"/>
             <Button text="Emergency Assistance" maxWidth="Infinity" onAction="#handleEmergencyAssistance"
                     style="-fx-background-color: #f44336; -fx-text-fill: white;"/>
         </VBox>

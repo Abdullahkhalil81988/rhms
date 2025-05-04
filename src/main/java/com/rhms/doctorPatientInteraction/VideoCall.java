@@ -33,6 +33,25 @@ public class VideoCall {
     }
     
     /**
+     * Joins an existing video call by opening the default browser with Google Meet link
+     * @param meetingId unique identifier for the meeting to join
+     * @throws Exception if there's an error joining the meeting
+     */
+    public static void joinVideoCall(String meetingId) throws Exception {
+        if (meetingId == null || meetingId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Meeting ID cannot be empty");
+        }
+        
+        if (Desktop.isDesktopSupported()) {
+            Desktop desktop = Desktop.getDesktop();
+            URI meetingUri = new URI(MEET_BASE_URL + meetingId);
+            desktop.browse(meetingUri);
+        } else {
+            throw new IOException("Desktop browsing not supported on this platform");
+        }
+    }
+    
+    /**
      * Generates a random meeting ID in format: xxx-xxxx-xxx
      * @return formatted meeting ID string
      */

@@ -61,7 +61,7 @@ public class DoctorDashboardController {
         scheduleView.setAlignment(Pos.TOP_CENTER);
         
         Label headerLabel = new Label("My Schedule");
-        headerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        headerLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         
         // Get active appointments for the current doctor
         ArrayList<Appointment> appointments = SessionManager.getAppointmentManager()
@@ -102,8 +102,13 @@ public class DoctorDashboardController {
         // Add placeholder text if no appointments
         appointmentTable.setPlaceholder(new Label("No appointments scheduled"));
         
-        // Add button for starting video consultation
+        // Style the table
+        appointmentTable.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-radius: 5px;");
+        
+        // Add button for starting video consultation with improved styling
         Button startVideoButton = new Button("Start Video Consultation");
+        startVideoButton.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold; " +
+                                  "-fx-padding: 10px 20px; -fx-border-radius: 5px;");
         startVideoButton.setOnAction(e -> {
             Appointment selectedAppointment = appointmentTable.getSelectionModel().getSelectedItem();
             if (selectedAppointment != null) {
@@ -119,8 +124,10 @@ public class DoctorDashboardController {
             }
         });
         
-        // Add button for canceling selected appointment
+        // Add button for canceling selected appointment with improved styling
         Button cancelButton = new Button("Cancel Selected Appointment");
+        cancelButton.setStyle("-fx-background-color: #dc3545; -fx-text-fill: white; -fx-font-weight: bold; " +
+                              "-fx-padding: 10px 20px; -fx-border-radius: 5px;");
         cancelButton.setOnAction(e -> {
             Appointment selectedAppointment = appointmentTable.getSelectionModel().getSelectedItem();
             if (selectedAppointment != null) {
@@ -148,11 +155,24 @@ public class DoctorDashboardController {
             }
         });
         
-        HBox buttonBox = new HBox(10);
+        // Create beautifully styled button container
+        HBox buttonBox = new HBox(20);  // Increased spacing between buttons
         buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.setPadding(new Insets(15, 0, 5, 0));
         buttonBox.getChildren().addAll(startVideoButton, cancelButton);
         
-        scheduleView.getChildren().addAll(headerLabel, appointmentTable, buttonBox);
+        // Add instructions label
+        Label instructionsLabel = new Label("Select an appointment from the table and use the buttons below to manage it.");
+        instructionsLabel.setStyle("-fx-font-style: italic; -fx-text-fill: #6c757d;");
+        
+        // Add a card-like effect for the entire section
+        VBox appointmentCard = new VBox(10);
+        appointmentCard.setStyle("-fx-background-color: white; -fx-padding: 15px; " +
+                                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 3); " +
+                                "-fx-background-radius: 5px;");
+        appointmentCard.getChildren().addAll(appointmentTable, instructionsLabel, buttonBox);
+        
+        scheduleView.getChildren().addAll(headerLabel, appointmentCard);
         contentArea.getChildren().add(scheduleView);
     }
     

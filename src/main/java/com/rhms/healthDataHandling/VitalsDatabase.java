@@ -1,6 +1,7 @@
 package com.rhms.healthDataHandling;
 
 import java.io.Serializable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import com.rhms.userManagement.Patient;
@@ -12,10 +13,14 @@ import com.rhms.userManagement.Patient;
 public class VitalsDatabase implements Serializable {
     private static final long serialVersionUID = 1L;
     
-    // Patient associated with these vital records
-    private Patient patient;
+    // Ensure patient reference doesn't cause serialization issues
+    private transient Patient patient; // Make patient transient
+    private int patientId; // Add patientId to maintain relationship
+    
     // Collection to store patient's vital sign records
     private ArrayList<VitalSign> vitals;
+    // Timestamp for the last update
+    private Date lastUpdated;
     
     /**
      * Creates a new vitals database for a specific patient
@@ -23,7 +28,9 @@ public class VitalsDatabase implements Serializable {
      */
     public VitalsDatabase(Patient patient) {
         this.patient = patient;
+        this.patientId = patient.getUserID(); // Store the ID separately
         this.vitals = new ArrayList<>();
+        this.lastUpdated = null;
     }
     
     /**
@@ -34,7 +41,15 @@ public class VitalsDatabase implements Serializable {
         if (vitals == null) {
             vitals = new ArrayList<>();
         }
+        
         vitals.add(vitalSign);
+        lastUpdated = new Date(); // Update timestamp
+        
+        System.out.println("Added vital to database: " + 
+                          vitalSign.getHeartRate() + ", " + 
+                          vitalSign.getOxygenLevel() + ", " + 
+                          vitalSign.getBloodPressure() + ", " + 
+                          vitalSign.getTemperature());
     }
     
     /**
@@ -77,5 +92,25 @@ public class VitalsDatabase implements Serializable {
      */
     public Patient getPatient() {
         return patient;
+    }
+    
+    /**
+     * Sets the patient associated with this vitals database
+     * @param patient The patient to be associated
+     */
+    public void setPatient(Patient patient) {
+        this.patient = patient;
+        this.patientId = patient.getUserID();
+    }
+    
+    // Ensure proper serialization 
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+        // Write patientId instead of patient reference
+        out.defaultWriteObject();
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        // Patient reference will be restored by Patient.readObject
     }
 }

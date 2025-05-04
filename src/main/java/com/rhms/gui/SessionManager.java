@@ -63,8 +63,32 @@ public class SessionManager {
     
     // Save data when application closes
     public static void saveData() {
-        DataPersistenceManager.saveAllData(
-            patients, doctors, administrators, appointmentManager.getAppointments());
+        try {
+            System.out.println("Saving system data...");
+            
+            // Make sure each vitals database has proper reference to its patient
+            for (Patient patient : patients) {
+                if (patient.getVitalsDatabase() != null) {
+                    patient.getVitalsDatabase().setPatient(patient);
+                }
+            }
+            
+            boolean saved = DataPersistenceManager.saveAllData(
+                patients,
+                doctors,
+                administrators,
+                appointmentManager.getAppointments()
+            );
+            
+            if (saved) {
+                System.out.println("Data saved successfully.");
+            } else {
+                System.err.println("Failed to save data.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error saving data: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     // Check login credentials
