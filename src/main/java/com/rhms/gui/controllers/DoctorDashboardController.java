@@ -38,6 +38,7 @@ import com.rhms.userManagement.Patient;
 public class DoctorDashboardController {
     @FXML private Label userNameLabel;
     @FXML private StackPane contentArea;
+    @FXML private Button maximizeButton;
     
     private Doctor currentDoctor;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -1205,5 +1206,17 @@ public class DoctorDashboardController {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+    
+    @FXML
+    private void handleMaximize(ActionEvent event) {
+        Stage stage = (Stage) maximizeButton.getScene().getWindow();
+        if (stage.isMaximized()) {
+            stage.setMaximized(false);
+            maximizeButton.setText("Maximize");
+        } else {
+            stage.setMaximized(true);
+            maximizeButton.setText("Restore");
+        }
     }
 }

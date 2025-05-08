@@ -18,6 +18,7 @@
          </Label>
          <Pane HBox.hgrow="ALWAYS" />
          <Label fx:id="welcomeLabel" text="Welcome, Administrator" textFill="WHITE"/>
+         <Button fx:id="maximizeButton" text="Maximize" onAction="#handleMaximize"/>
          <Button text="Logout" onAction="#handleLogout"/>
       </HBox>
    </top>

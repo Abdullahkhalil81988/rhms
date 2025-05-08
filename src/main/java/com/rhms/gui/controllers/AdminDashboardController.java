@@ -37,6 +37,7 @@ import com.rhms.userManagement.UserIDManager;
 public class AdminDashboardController {
     @FXML private Label welcomeLabel;
     @FXML private StackPane contentArea;
+    @FXML private Button maximizeButton;
     
     private Administrator currentAdmin;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -2125,5 +2126,17 @@ public class AdminDashboardController {
     private void handleEmailSettings(ActionEvent event) {
         // Call the existing configuration dialog
         configureEmailSettings();
+    }
+    
+    @FXML
+    private void handleMaximize(ActionEvent event) {
+        Stage stage = (Stage) maximizeButton.getScene().getWindow();
+        if (stage.isMaximized()) {
+            stage.setMaximized(false);
+            maximizeButton.setText("Maximize");
+        } else {
+            stage.setMaximized(true);
+            maximizeButton.setText("Restore");
+        }
     }
 }

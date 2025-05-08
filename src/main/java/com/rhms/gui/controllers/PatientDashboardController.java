@@ -46,6 +46,7 @@ public class PatientDashboardController {
     @FXML private Label userNameLabel;
     @FXML private StackPane contentArea;
     @FXML private VBox navigationVBox;
+    @FXML private Button maximizeButton;
     
     private Patient currentPatient;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -1444,6 +1445,18 @@ public class PatientDashboardController {
         
         videoConsultView.getChildren().addAll(headerLabel, videoCallCard, scheduledConsultationsBox, tipsTitledPane);
         contentArea.getChildren().add(videoConsultView);
+    }
+    
+    @FXML
+    private void handleMaximize(ActionEvent event) {
+        Stage stage = (Stage) maximizeButton.getScene().getWindow();
+        if (stage.isMaximized()) {
+            stage.setMaximized(false);
+            maximizeButton.setText("Maximize");
+        } else {
+            stage.setMaximized(true);
+            maximizeButton.setText("Restore");
+        }
     }
     
     private void showAlert(Alert.AlertType type, String title, String content) {
