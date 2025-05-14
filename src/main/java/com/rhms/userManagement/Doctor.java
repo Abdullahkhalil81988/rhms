@@ -6,7 +6,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Doctor extends User implements Serializable {
+public class Doctor extends User {
     private static final long serialVersionUID = 1L;
     
     private String specialization;
@@ -33,6 +33,14 @@ public class Doctor extends User implements Serializable {
     
     public ArrayList<Patient> getPatients() {
         return patients;
+    }
+    
+    /**
+     * Set the list of patients for this doctor
+     * @param patients Updated list of patients
+     */
+    public void setPatients(ArrayList<Patient> patients) {
+        this.patients = patients;
     }
     
     public void addPatient(Patient patient) {
@@ -73,5 +81,32 @@ public class Doctor extends User implements Serializable {
         
         // Note: The feedback is already being stored in the patient's medical history
         // in the calling code, so this is primarily for the doctor's records
+    }
+    
+    /**
+     * Get list of feedback received from patients
+     */
+    public ArrayList<Map<String, Object>> getFeedbackReceived() {
+        if (feedbackReceived == null) {
+            feedbackReceived = new ArrayList<>();
+        }
+        return feedbackReceived;
+    }
+
+    /**
+     * Add feedback to the doctor's feedback list
+     */
+    public void addFeedback(Patient patient, int rating, String comments) {
+        if (feedbackReceived == null) {
+            feedbackReceived = new ArrayList<>();
+        }
+        
+        Map<String, Object> feedback = new HashMap<>();
+        feedback.put("patient", patient.getName());
+        feedback.put("rating", rating);
+        feedback.put("comments", comments);
+        feedback.put("date", new Date());
+        
+        feedbackReceived.add(feedback);
     }
 }

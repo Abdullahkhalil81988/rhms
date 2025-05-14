@@ -7,24 +7,28 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.application.Platform;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 import com.rhms.analytics.AnalyticsResult;
 import com.rhms.analytics.ChartGenerator;
 import com.rhms.analytics.HealthAnalytics;
 import com.rhms.appointmentScheduling.Appointment;
 import com.rhms.doctorPatientInteraction.ChatClient;
+import com.rhms.doctorPatientInteraction.ChatMessage;
+import com.rhms.doctorPatientInteraction.ChatMessageListener;
 import com.rhms.doctorPatientInteraction.Feedback;
 import com.rhms.doctorPatientInteraction.MedicalHistory;
 import com.rhms.doctorPatientInteraction.Prescription;
@@ -39,6 +43,7 @@ public class DoctorDashboardController {
     @FXML private Label userNameLabel;
     @FXML private StackPane contentArea;
     @FXML private Button maximizeButton;
+    @FXML private VBox navigationVBox;
     
     private Doctor currentDoctor;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -48,8 +53,26 @@ public class DoctorDashboardController {
         // Get current doctor from session
         currentDoctor = (Doctor) SessionManager.getCurrentUser();
         
+        // Initialize doctor data if necessary
         if (currentDoctor != null) {
             userNameLabel.setText("Welcome, Dr. " + currentDoctor.getName());
+            
+            // Initialize any other necessary objects or data
+        }
+        
+        // Check if navigationVBox is properly loaded
+        if (navigationVBox == null) {
+            System.err.println("ERROR: navigationVBox is null in DoctorDashboardController - FXML binding issue");
+            // Create a temporary VBox to avoid NPE
+            navigationVBox = new VBox();
+        } else {
+            System.out.println("Navigation VBox successfully loaded from FXML");
+            
+            // Add feedback button to navigation
+            Button viewFeedbackButton = new Button("View Patient Feedback");
+            viewFeedbackButton.setMaxWidth(Double.MAX_VALUE);
+            viewFeedbackButton.setOnAction(this::handleViewFeedback);
+            navigationVBox.getChildren().add(viewFeedbackButton);
         }
     }
     
@@ -93,7 +116,8 @@ public class DoctorDashboardController {
         });
         statusColumn.setPrefWidth(100);
         
-        appointmentTable.getColumns().addAll(dateColumn, patientColumn, statusColumn);
+        // Add columns to table using a list to avoid varargs warning
+        appointmentTable.getColumns().setAll(List.of(dateColumn, patientColumn, statusColumn));
         appointmentTable.setPrefHeight(300);
         
         // Add data to table
@@ -217,7 +241,7 @@ public class DoctorDashboardController {
         });
         statusColumn.setPrefWidth(100);
         
-        appointmentTable.getColumns().addAll(dateColumn, patientColumn, statusColumn);
+        appointmentTable.getColumns().setAll(List.of(dateColumn, patientColumn, statusColumn));
         appointmentTable.setPrefHeight(300);
         
         // Add data to table
@@ -321,7 +345,7 @@ public class DoctorDashboardController {
         });
         phoneColumn.setPrefWidth(150);
         
-        patientTable.getColumns().addAll(nameColumn, emailColumn, phoneColumn);
+        patientTable.getColumns().setAll(List.of(nameColumn, emailColumn, phoneColumn));
         patientTable.setPrefHeight(300);
         
         // Add data to table
@@ -468,8 +492,8 @@ public class DoctorDashboardController {
                         cellData.getValue().getTemperature());
             });
             
-            vitalsTable.getColumns().addAll(heartRateColumn, oxygenColumn, bpColumn, tempColumn);
-            vitalsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+            vitalsTable.getColumns().setAll(List.of(heartRateColumn, oxygenColumn, bpColumn, tempColumn));
+            vitalsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
             
             // Add data to table
             ArrayList<VitalSign> vitals = patient.getVitalsDatabase().getVitals();
@@ -715,8 +739,8 @@ public class DoctorDashboardController {
                     cellData.getValue().getSchedule());
         });
         
-        prescriptionTable.getColumns().addAll(medicationColumn, dosageColumn, scheduleColumn);
-        prescriptionTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        prescriptionTable.getColumns().setAll(List.of(medicationColumn, dosageColumn, scheduleColumn));
+        prescriptionTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         prescriptionTable.setPrefHeight(200);
         
         prescriptionTable.setPlaceholder(new Label("No prescriptions found"));
@@ -824,17 +848,40 @@ public class DoctorDashboardController {
             patientComboBox.setValue(patientsData.get(0));
         }
         
-        // Chat history display
+        // Chat history display with improved styling
         TextArea chatHistoryArea = new TextArea();
         chatHistoryArea.setEditable(false);
         chatHistoryArea.setPrefHeight(300);
-        chatHistoryArea.setStyle("-fx-font-family: monospace;");
+        chatHistoryArea.setStyle("-fx-font-family: 'Segoe UI', Arial, sans-serif;");
+        chatHistoryArea.setWrapText(true);
+        
+        // Create a chat client for the current doctor
+        ChatClient chatClient = new ChatClient(currentDoctor);
+        
+        // Setup chat message listener for real-time updates
+        chatClient.addMessageListener(new ChatMessageListener() {
+            @Override
+            public void onNewMessage(ChatMessage message) {
+                // Check if the message is related to the currently selected patient
+                Patient selectedPatient = patientComboBox.getValue();
+                if (selectedPatient != null && 
+                    (message.getSenderId() == selectedPatient.getUserID() || 
+                     message.getReceiverId() == selectedPatient.getUserID())) {
+                    
+                    // Update UI on the JavaFX thread
+                    Platform.runLater(() -> {
+                        updateChatDisplay(chatHistoryArea, selectedPatient, chatClient);
+                    });
+                }
+            }
+        });
         
         // Message input and send button
         TextField messageField = new TextField();
         messageField.setPromptText("Type your message here...");
         
         Button sendButton = new Button("Send");
+        sendButton.setStyle("-fx-background-color: #0078d7; -fx-text-fill: white;");
         sendButton.setDefaultButton(true);
         
         HBox messageBox = new HBox(10);
@@ -846,13 +893,16 @@ public class DoctorDashboardController {
         patientComboBox.setOnAction(e -> {
             Patient selectedPatient = patientComboBox.getValue();
             if (selectedPatient != null) {
-                updateChatHistory(chatHistoryArea, selectedPatient);
+                updateChatDisplay(chatHistoryArea, selectedPatient, chatClient);
+                
+                // Mark messages as read when selecting a patient
+                chatClient.markMessagesAsRead(selectedPatient.getUserID());
             }
         });
         
-        // Initialize chat history with first patient
+        // Initially load chat history with first patient
         if (!patientsData.isEmpty()) {
-            updateChatHistory(chatHistoryArea, patientsData.get(0));
+            updateChatDisplay(chatHistoryArea, patientsData.get(0), chatClient);
         }
         
         // Send message action
@@ -861,18 +911,44 @@ public class DoctorDashboardController {
             Patient selectedPatient = patientComboBox.getValue();
             
             if (!message.isEmpty() && selectedPatient != null) {
-                // Get chat client or create if not exists
-                ChatClient chatClient = new ChatClient(currentDoctor, SessionManager.getChatServer());
+                // Send message using the chat client
+                chatClient.sendMessage(selectedPatient.getUserID(), message);
                 
-                // Send message
-                chatClient.sendMessage(selectedPatient.getName(), message);
-                
-                // Update chat history
-                updateChatHistory(chatHistoryArea, selectedPatient);
+                // Update chat display
+                updateChatDisplay(chatHistoryArea, selectedPatient, chatClient);
                 
                 // Clear message field
                 messageField.clear();
+                messageField.requestFocus();
             }
+        });
+        
+        // Add notification badges for unread messages
+        Button checkUnreadButton = new Button("Check Unread Messages");
+        checkUnreadButton.setOnAction(e -> {
+            StringBuilder unreadSummary = new StringBuilder("Unread messages:\n");
+            boolean hasUnread = false;
+            
+            for (Patient patient : patients) {
+                List<ChatMessage> unreadMessages = chatClient.getUnreadMessages(patient.getUserID());
+                if (!unreadMessages.isEmpty()) {
+                    hasUnread = true;
+                    unreadSummary.append(patient.getName())
+                                .append(": ")
+                                .append(unreadMessages.size())
+                                .append(" unread message(s)\n");
+                }
+            }
+            
+            if (!hasUnread) {
+                unreadSummary.append("No unread messages");
+            }
+            
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Unread Messages");
+            alert.setHeaderText(null);
+            alert.setContentText(unreadSummary.toString());
+            alert.showAndWait();
         });
         
         chatView.getChildren().addAll(
@@ -881,24 +957,50 @@ public class DoctorDashboardController {
                 patientComboBox, 
                 new Label("Chat History:"), 
                 chatHistoryArea, 
-                messageBox);
+                messageBox,
+                checkUnreadButton);
         
         contentArea.getChildren().add(chatView);
     }
     
-    private void updateChatHistory(TextArea chatArea, Patient patient) {
-        ChatClient chatClient = new ChatClient(currentDoctor, SessionManager.getChatServer());
+    /**
+     * Helper method to update the chat display
+     */
+    private void updateChatDisplay(TextArea chatArea, Patient patient, ChatClient chatClient) {
+        // Get chat history
+        List<ChatMessage> history = chatClient.getChatHistory(patient.getUserID());
         
-        StringBuilder chatHistory = new StringBuilder();
-        for (String message : SessionManager.getChatServer().getChatHistory(currentDoctor.getName(), patient.getName())) {
-            chatHistory.append(message).append("\n");
+        // Clear current display
+        chatArea.clear();
+        
+        if (history.isEmpty()) {
+            chatArea.setText("No messages yet. Start the conversation!");
+            return;
         }
         
-        if (chatHistory.length() == 0) {
-            chatHistory.append("No messages yet. Start the conversation!");
+        // Format and display messages
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        
+        for (ChatMessage message : history) {
+            String sender;
+            
+            if (message.getSenderId() == currentDoctor.getUserID()) {
+                sender = "Me";
+                // Unused style: "-fx-background-color: #DCF8C6;"  // Light green for self
+            } else {
+                sender = patient.getName();
+                // Unused style: "-fx-background-color: #ECECEC;"  // Light gray for others
+            }
+            
+            String formattedMessage = String.format("[%s] %s: %s\n", 
+                    timeFormat.format(message.getTimestamp()),
+                    sender,
+                    message.getContent());
+            
+            chatArea.appendText(formattedMessage);
         }
         
-        chatArea.setText(chatHistory.toString());
+        // Scroll to bottom
         chatArea.positionCaret(chatArea.getText().length());
     }
     
@@ -1218,5 +1320,148 @@ public class DoctorDashboardController {
             stage.setMaximized(true);
             maximizeButton.setText("Restore");
         }
+    }
+    
+    @FXML
+    private void handleViewFeedback(ActionEvent event) {
+        contentArea.getChildren().clear();
+        
+        VBox feedbackView = new VBox(15);
+        feedbackView.setPadding(new Insets(20));
+        feedbackView.setAlignment(Pos.TOP_CENTER);
+        
+        Label headerLabel = new Label("Patient Feedback");
+        headerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        
+        // Get all feedback from patients
+        ArrayList<Feedback> allFeedback = new ArrayList<>();
+        
+        // Get all patients
+        for (Patient patient : SessionManager.getPatients()) {
+            if (patient.getMedicalHistory() != null) {
+                for (Feedback feedback : patient.getMedicalHistory().getPastConsultations()) {
+                    // Only include feedback for this doctor
+                    if (feedback.getDoctor().getUserID() == currentDoctor.getUserID()) {
+                        allFeedback.add(feedback);
+                    }
+                }
+            }
+        }
+        
+        // Create a table to display feedback
+        TableView<Feedback> feedbackTable = new TableView<>();
+        
+        // Create columns
+        TableColumn<Feedback, String> patientColumn = new TableColumn<>("Patient");
+        patientColumn.setCellValueFactory(cellData -> {
+            return new javafx.beans.property.SimpleStringProperty(
+                    cellData.getValue().getPatient().getName());
+        });
+        patientColumn.setPrefWidth(150);
+        
+        TableColumn<Feedback, String> dateColumn = new TableColumn<>("Date");
+        dateColumn.setCellValueFactory(cellData -> {
+            Date date = cellData.getValue().getConsultationDate();
+            return new javafx.beans.property.SimpleStringProperty(
+                    new SimpleDateFormat("yyyy-MM-dd HH:mm").format(date));
+        });
+        dateColumn.setPrefWidth(150);
+        
+        TableColumn<Feedback, String> commentsColumn = new TableColumn<>("Feedback");
+        commentsColumn.setCellValueFactory(cellData -> {
+            return new javafx.beans.property.SimpleStringProperty(
+                    cellData.getValue().getComments());
+        });
+        commentsColumn.setPrefWidth(300);
+        
+        // Set cell factory for comments column to wrap text
+        commentsColumn.setCellFactory(tc -> {
+            TableCell<Feedback, String> cell = new TableCell<>();
+            Text text = new Text();
+            cell.setGraphic(text);
+            cell.setPrefHeight(Control.USE_COMPUTED_SIZE);
+            text.wrappingWidthProperty().bind(commentsColumn.widthProperty());
+            text.textProperty().bind(cell.itemProperty());
+            return cell;
+        });
+        
+        // Use List.of instead of varargs to avoid type safety warning
+        feedbackTable.getColumns().setAll(List.of(patientColumn, dateColumn, commentsColumn));
+        feedbackTable.setPrefHeight(400);
+        
+        // Add data to table
+        ObservableList<Feedback> feedbackData = FXCollections.observableArrayList(allFeedback);
+        feedbackTable.setItems(feedbackData);
+        
+        // Add placeholder if no feedback
+        feedbackTable.setPlaceholder(new Label("No feedback received yet."));
+        
+        // Add feedback summary
+        VBox summaryBox = new VBox(10);
+        summaryBox.setPadding(new Insets(15));
+        summaryBox.setStyle("-fx-border-color: #cccccc; -fx-background-color: #f8f9fa; -fx-border-radius: 5px;");
+        
+        Label summaryLabel = new Label("Feedback Summary");
+        summaryLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        // Calculate average rating
+        double averageRating = 0;
+        int ratingCount = 0;
+        
+        for (Feedback feedback : allFeedback) {
+            String comments = feedback.getComments();
+            if (comments != null && comments.length() >= 2 && comments.contains("★")) {
+                try {
+                    int rating = Integer.parseInt(comments.substring(0, 1));
+                    averageRating += rating;
+                    ratingCount++;
+                } catch (NumberFormatException e) {
+                    // Skip if cannot parse rating
+                }
+            }
+        }
+        
+        String ratingText;
+        if (ratingCount > 0) {
+            averageRating /= ratingCount;
+            ratingText = String.format("Average Rating: %.1f/5 stars (from %d ratings)", averageRating, ratingCount);
+        } else {
+            ratingText = "No ratings received yet.";
+        }
+        
+        Label ratingsLabel = new Label(ratingText);
+        Label totalFeedbackLabel = new Label("Total Feedback Received: " + allFeedback.size());
+        
+        summaryBox.getChildren().addAll(summaryLabel, totalFeedbackLabel, ratingsLabel);
+        
+        // Add option to respond to feedback
+        Button respondButton = new Button("Respond to Selected Feedback");
+        respondButton.setOnAction(e -> {
+            Feedback selectedFeedback = feedbackTable.getSelectionModel().getSelectedItem();
+            if (selectedFeedback != null) {
+                // Show dialog to respond to feedback
+                TextInputDialog dialog = new TextInputDialog();
+                dialog.setTitle("Respond to Feedback");
+                dialog.setHeaderText("Respond to " + selectedFeedback.getPatient().getName() + "'s Feedback");
+                dialog.setContentText("Your response:");
+                
+                Optional<String> result = dialog.showAndWait();
+                result.ifPresent(response -> {
+                    // Add response to chat system
+                    ChatClient chatClient = new ChatClient(currentDoctor);
+                    chatClient.sendMessage(selectedFeedback.getPatient().getUserID(), 
+                            "Response to your feedback: " + response);
+                    
+                    showAlert(Alert.AlertType.INFORMATION, "Response Sent", 
+                             "Your response has been sent to " + selectedFeedback.getPatient().getName());
+                });
+            } else {
+                showAlert(Alert.AlertType.WARNING, "No Selection", 
+                         "Please select a feedback item to respond to.");
+            }
+        });
+        
+        feedbackView.getChildren().addAll(headerLabel, summaryBox, feedbackTable, respondButton);
+        contentArea.getChildren().add(feedbackView);
     }
 }

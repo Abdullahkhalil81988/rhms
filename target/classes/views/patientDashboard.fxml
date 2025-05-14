@@ -7,7 +7,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.rhms.gui.controllers.PatientDashboardController"
-           stylesheets="/css/styles.css">
+           stylesheets="@/css/styles.css">
     <top>
         <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: #2196F3; -fx-padding: 10px;">
             <Label text="Patient Dashboard" textFill="WHITE">
@@ -23,7 +23,7 @@
     </top>
     
     <left>
-        <VBox prefWidth="200" spacing="10" style="-fx-background-color: #f0f0f0; -fx-padding: 10px;">
+        <VBox fx:id="navigationVBox" prefWidth="200" spacing="10" style="-fx-background-color: #f0f0f0; -fx-padding: 10px;">
             <Button text="My Appointments" maxWidth="Infinity" onAction="#handleViewAppointments"/>
             <Button text="Book Appointment" maxWidth="Infinity" onAction="#handleBookAppointment"/>
             <Button text="My Health Data" maxWidth="Infinity" onAction="#handleViewHealthData"/>
@@ -31,8 +31,7 @@
             <Button text="Medical History" maxWidth="Infinity" onAction="#handleViewMedicalHistory"/>
             <Button text="Chat with Doctor" maxWidth="Infinity" onAction="#handleChatWithDoctor"/>
             <Button text="Video Consultation" maxWidth="Infinity" onAction="#handleVideoConsultation"/>
-            <Button text="Emergency Assistance" maxWidth="Infinity" onAction="#handleEmergencyAssistance"
-                    style="-fx-background-color: #f44336; -fx-text-fill: white;"/>
+            <Button text="Emergency Assistance" maxWidth="Infinity" style="-fx-background-color: #f44336; -fx-text-fill: white;" onAction="#handleEmergencyAssistance"/>
         </VBox>
     </left>
     

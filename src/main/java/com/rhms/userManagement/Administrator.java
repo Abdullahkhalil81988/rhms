@@ -3,7 +3,7 @@ package com.rhms.userManagement;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Administrator extends User implements Serializable {
+public class Administrator extends User {
     private static final long serialVersionUID = 1L;
     
     private ArrayList<Doctor> managedDoctors;

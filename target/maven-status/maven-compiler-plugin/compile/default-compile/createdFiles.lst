@@ -8,6 +8,7 @@ com\rhms\notifications\EmailNotification.class
 com\rhms\gui\controllers\AdminDashboardController$6.class
 com\rhms\userManagement\User.class
 com\rhms\appointmentScheduling\AppointmentManager.class
+com\rhms\gui\controllers\DoctorDashboardController$7.class
 com\rhms\emergencyAlert\PanicButton.class
 com\rhms\gui\controllers\DoctorDashboardController$2.class
 com\rhms\gui\controllers\PatientDashboardController$3.class
@@ -31,7 +32,6 @@ com\rhms\notifications\SMSNotification.class
 com\rhms\gui\controllers\AdminDashboardController$7.class
 com\rhms\userManagement\Administrator.class
 com\rhms\notifications\EmailNotification$2.class
-com\rhms\TESTAPP.class
 com\rhms\notifications\Notifiable.class
 com\rhms\analytics\ChartGenerator.class
 com\rhms\gui\controllers\PatientDashboardController$1.class
@@ -57,7 +57,6 @@ com\rhms\gui\controllers\AdminDashboardController$5.class
 com\rhms\doctorPatientInteraction\ChatServer.class
 com\rhms\appointmentScheduling\Appointment.class
 com\rhms\notifications\ReminderService$1.class
-com\rhms\persistence\DataPersistenceManager$SerializableAppointment.class
+com\rhms\TESTAPP$1.class
 com\rhms\gui\controllers\DoctorDashboardController$3.class
 com\rhms\gui\controllers\DoctorDashboardController$6.class
-com\rhms\persistence\DataPersistenceManager$UserIDCounter.class

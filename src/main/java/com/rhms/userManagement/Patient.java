@@ -10,7 +10,7 @@ import com.rhms.emergencyAlert.PanicButton;
 import com.rhms.healthDataHandling.VitalSign;
 import com.rhms.healthDataHandling.VitalsDatabase;
 
-public class Patient extends User implements Serializable {
+public class Patient extends User {
     private static final long serialVersionUID = 1L;
     
     private ArrayList<VitalSign> vitalSigns;

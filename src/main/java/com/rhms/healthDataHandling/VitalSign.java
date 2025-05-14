@@ -14,7 +14,7 @@ public class VitalSign implements Serializable {
     private double oxygenLevel;    // percentage
     private double bloodPressure;  // mmHg
     private double temperature;    // °C
-    private Date timestamp;
+    private Date timestamp;       // Date and time of measurement
 
     /**
      * Creates a new vital signs record

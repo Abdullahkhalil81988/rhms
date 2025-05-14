@@ -24,19 +24,13 @@ public class SessionManager {
     // Services
     private static AppointmentManager appointmentManager = new AppointmentManager();
     private static EmergencyAlert emergencyAlert = new EmergencyAlert();
-    private static ChatServer chatServer = new ChatServer();
+    private static ChatServer chatServer = ChatServer.getInstance();
     private static SMSNotification smsNotification = new SMSNotification();
     private static EmailNotification emailNotification = new EmailNotification();
     
     // Initialize data, load from files if available
     static {
-        boolean dataLoaded = DataPersistenceManager.loadAllData(
-            patients, doctors, administrators, appointmentManager.getAppointments());
-        
-        if (!dataLoaded) {
-            // If no data was loaded, initialize demo data
-            initializeDemoData();
-        }
+        initialize();
     }
     
     private static void initializeDemoData() {
@@ -61,27 +55,22 @@ public class SessionManager {
         System.out.println("Patient - Email: ali@example.com, Password: patient123");
     }
     
-    // Save data when application closes
     public static void saveData() {
         try {
-            System.out.println("Saving system data...");
+            // Fix relationships before saving
+            fixObjectRelationships();
             
-            // Make sure each vitals database has proper reference to its patient
-            for (Patient patient : patients) {
-                if (patient.getVitalsDatabase() != null) {
-                    patient.getVitalsDatabase().setPatient(patient);
-                }
-            }
-            
+            // Save all data using the DataPersistenceManager
             boolean saved = DataPersistenceManager.saveAllData(
-                patients,
-                doctors,
-                administrators,
-                appointmentManager.getAppointments()
+                patients, 
+                doctors, 
+                administrators, 
+                appointmentManager.getAppointments(),
+                chatServer
             );
             
             if (saved) {
-                System.out.println("Data saved successfully.");
+                System.out.println("All data saved successfully.");
             } else {
                 System.err.println("Failed to save data.");
             }
@@ -89,6 +78,95 @@ public class SessionManager {
             System.err.println("Error saving data: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Fix object relationships before saving
+     * This ensures that references between objects are consistent
+     */
+    private static void fixObjectRelationships() {
+        // Fix patient-doctor relationships
+        for (Patient patient : patients) {
+            if (patient.getMedicalHistory() != null) {
+                // Ensure all feedback is properly connected to the right objects
+                for (Feedback feedback : patient.getMedicalHistory().getPastConsultations()) {
+                    // Ensure doctor and patient references are up to date
+                    if (feedback.getDoctor() != null) {
+                        // Find the doctor in our current list to ensure it's the same instance
+                        for (Doctor doctor : doctors) {
+                            if (doctor.getUserID() == feedback.getDoctor().getUserID()) {
+                                feedback.setDoctor(doctor);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Update patient reference to ensure consistency
+                    feedback.setPatient(patient);
+                }
+            }
+        }
+        
+        // Fix doctor-patient relationships
+        for (Doctor doctor : doctors) {
+            if (doctor.getPatients() != null) {
+                ArrayList<Patient> updatedPatients = new ArrayList<>();
+                for (Patient p : doctor.getPatients()) {
+                    // Find the patient in our current list
+                    for (Patient current : patients) {
+                        if (current.getUserID() == p.getUserID()) {
+                            updatedPatients.add(current);
+                            break;
+                        }
+                    }
+                }
+                // Replace with updated list if we found any matches
+                if (!updatedPatients.isEmpty()) {
+                    doctor.setPatients(updatedPatients);
+                }
+            }
+        }
+        
+        // Fix appointment relationships
+        for (Appointment appointment : appointmentManager.getAppointments()) {
+            // Update doctor reference
+            if (appointment.getDoctor() != null) {
+                for (Doctor doctor : doctors) {
+                    if (doctor.getUserID() == appointment.getDoctor().getUserID()) {
+                        appointment.setDoctor(doctor);
+                        break;
+                    }
+                }
+            }
+            
+            // Update patient reference
+            if (appointment.getPatient() != null) {
+                for (Patient patient : patients) {
+                    if (patient.getUserID() == appointment.getPatient().getUserID()) {
+                        appointment.setPatient(patient);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Initialize the system
+     * Should be called when application starts
+     */
+    public static void initialize() {
+        // Load data if available
+        boolean dataLoaded = DataPersistenceManager.loadAllData(
+            patients, doctors, administrators, appointmentManager.getAppointments());
+        
+        if (!dataLoaded) {
+            // If no data was loaded, initialize demo data
+            initializeDemoData();
+        }
+        
+        // Initialize chat system
+        initializeChatSystem();
     }
     
     // Check login credentials
@@ -213,6 +291,24 @@ public class SessionManager {
     
     public static EmailNotification getEmailNotification() {
         return emailNotification;
+    }
+    
+    /**
+     * Initialize chat system
+     */
+    public static void initializeChatSystem() {
+        // Ensure the chat server is initialized
+        ChatServer chatServer = getChatServer();
+        
+        // Register all users with the chat server
+        // (This could be moved to user login process)
+        for (Doctor doctor : doctors) {
+            // Any initialization needed for doctor chat
+        }
+        
+        for (Patient patient : patients) {
+            // Any initialization needed for patient chat
+        }
     }
     
     // Log out the current user

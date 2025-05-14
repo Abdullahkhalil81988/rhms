@@ -85,7 +85,7 @@ public class HealthDataVisualizer {
             
             // Graph styling
             int padding = 50;
-            int labelPadding = 25;
+            // Removed unused variable: int labelPadding = 25;
             Color lineColor = new Color(44, 102, 230);
             Color pointColor = new Color(100, 100, 100, 180);
             Color gridColor = new Color(200, 200, 200, 200);

@@ -119,7 +119,8 @@ public class MedicalHistory implements Serializable {
     public void processConsultations(MedicalHistory medHistory) {
         if (medHistory.getConsultations() != null) {
             for (Feedback feedback : medHistory.getConsultations()) {
-                // code here
+                // Add the feedback to this medical history
+                this.addFeedback(feedback);
             }
         }
     }

@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.rhms.analytics.AnalyticsResult;
@@ -28,6 +31,8 @@ import com.rhms.analytics.HealthAnalytics;
 import com.rhms.analytics.HealthDataVisualizer;
 import com.rhms.appointmentScheduling.Appointment;
 import com.rhms.doctorPatientInteraction.ChatClient;
+import com.rhms.doctorPatientInteraction.ChatMessage;
+import com.rhms.doctorPatientInteraction.ChatMessageListener;
 import com.rhms.doctorPatientInteraction.Feedback;
 import com.rhms.doctorPatientInteraction.MedicalHistory;
 import com.rhms.doctorPatientInteraction.VideoCall;
@@ -63,19 +68,32 @@ public class PatientDashboardController {
             if (currentPatient.getVitalsDatabase() == null) {
                 System.out.println("Creating new vitals database for patient");
                 currentPatient.setVitalsDatabase(new VitalsDatabase(currentPatient));
-            } else {
-                VitalsDatabase db = currentPatient.getVitalsDatabase();
-                int vitalCount = db.getVitals().size();
-                System.out.println("Using existing vitals database with " + vitalCount + " records");
                 
-                // Print some sample vitals if available
-                if (vitalCount > 0) {
-                    System.out.println("Sample vital record: " + 
-                        db.getVitals().get(0).getHeartRate() + "bpm, " +
-                        db.getVitals().get(0).getOxygenLevel() + "%, " +
-                        db.getVitals().get(0).getBloodPressure() + "mmHg, " +
-                        db.getVitals().get(0).getTemperature() + "°C");
-                }
+                // Make sure to save immediately after creating
+                SessionManager.saveData();
+            }
+
+            // Always get the freshest data
+            final VitalsDatabase vitalsDB = currentPatient.getVitalsDatabase();
+
+            // Ensure the patient reference is valid
+            if (vitalsDB.getPatient() == null || vitalsDB.getPatient().getUserID() != currentPatient.getUserID()) {
+                System.out.println("Fixing patient reference in vitals database");
+                vitalsDB.setPatient(currentPatient);
+                SessionManager.saveData();
+            }
+            
+            VitalsDatabase db = currentPatient.getVitalsDatabase();
+            int vitalCount = db.getVitals().size();
+            System.out.println("Using existing vitals database with " + vitalCount + " records");
+            
+            // Print some sample vitals if available
+            if (vitalCount > 0) {
+                System.out.println("Sample vital record: " + 
+                    db.getVitals().get(0).getHeartRate() + "bpm, " +
+                    db.getVitals().get(0).getOxygenLevel() + "%, " +
+                    db.getVitals().get(0).getBloodPressure() + "mmHg, " +
+                    db.getVitals().get(0).getTemperature() + "°C");
             }
             
             // Initialize medical history if needed
@@ -88,6 +106,12 @@ public class PatientDashboardController {
                 currentPatient.setPanicButton(new PanicButton(currentPatient));
             }
         }
+
+        // Add feedback button to navigation
+        Button feedbackButton = new Button("Provide Feedback");
+        feedbackButton.setMaxWidth(Double.MAX_VALUE);
+        feedbackButton.setOnAction(this::handleProvideFeedback);
+        navigationVBox.getChildren().add(feedbackButton);
     }
     
     @FXML
@@ -319,10 +343,21 @@ public class PatientDashboardController {
         // Get vitals data
         final VitalsDatabase vitalsDB;
         if (currentPatient.getVitalsDatabase() == null) {
+            System.out.println("Creating new vitals database for patient");
             vitalsDB = new VitalsDatabase(currentPatient);
             currentPatient.setVitalsDatabase(vitalsDB);
+            
+            // Make sure to save immediately after creating
+            SessionManager.saveData();
         } else {
             vitalsDB = currentPatient.getVitalsDatabase();
+        }
+
+        // Ensure the patient reference is valid
+        if (vitalsDB.getPatient() == null || vitalsDB.getPatient().getUserID() != currentPatient.getUserID()) {
+            System.out.println("Fixing patient reference in vitals database");
+            vitalsDB.setPatient(currentPatient);
+            SessionManager.saveData();
         }
         
         ArrayList<VitalSign> vitals = vitalsDB.getVitals();
@@ -474,103 +509,30 @@ public class PatientDashboardController {
         
         if (selectedFile != null) {
             try {
-                System.out.println("Processing CSV file: " + selectedFile.getAbsolutePath());
-                
                 // Get vitals database
-                final VitalsDatabase vitalsDB;
                 if (currentPatient.getVitalsDatabase() == null) {
                     System.out.println("Creating new vitals database for patient");
-                    vitalsDB = new VitalsDatabase(currentPatient);
-                    currentPatient.setVitalsDatabase(vitalsDB);
-                } else {
-                    vitalsDB = currentPatient.getVitalsDatabase();
+                    VitalsDatabase newDB = new VitalsDatabase(currentPatient);
+                    currentPatient.setVitalsDatabase(newDB);
                 }
                 
-                // Process CSV file using a try-with-resources approach for safe file handling
-                System.out.println("Starting CSV processing...");
+                final VitalsDatabase vitalsDB = currentPatient.getVitalsDatabase();
+                vitalsDB.setPatient(currentPatient);
+                
+                // Process CSV file and add vitals
                 CSVVitalsProcessor processor = new CSVVitalsProcessor();
                 ArrayList<VitalSign> importedVitals = processor.processCSVFile(selectedFile.getAbsolutePath());
                 
                 if (importedVitals != null && !importedVitals.isEmpty()) {
-                    System.out.println("Successfully imported " + importedVitals.size() + " vitals");
-                    
-                    // Add each vital sign to the database
                     for (VitalSign vital : importedVitals) {
                         vitalsDB.addVitalRecord(vital);
                     }
                     
-                    // Update patient's vitals database
-                    currentPatient.setVitalsDatabase(vitalsDB);
+                    // Save the data immediately
+                    SessionManager.saveData();
                     
-                    // Find the patient in the patients list and update it
-                    ArrayList<Patient> patients = SessionManager.getPatients();
-                    for (int i = 0; i < patients.size(); i++) {
-                        if (patients.get(i).getUserID() == currentPatient.getUserID()) {
-                            System.out.println("Updating patient in session list with ID: " + currentPatient.getUserID());
-                            
-                            // Critical: ensure the patient's vitals database is properly set
-                            VitalsDatabase db = currentPatient.getVitalsDatabase();
-                            if (db != null) {
-                                db.setPatient(currentPatient);
-                                System.out.println("Verified vitals database has proper patient reference");
-                            }
-                            
-                            patients.set(i, currentPatient);
-                            break;
-                        }
-                    }
-                    
-                    // Call SessionManager's saveData method for reliable saving
-                    try {
-                        System.out.println("Attempting to save data after vitals update...");
-                        SessionManager.saveData();
-                        System.out.println("Data saved successfully through SessionManager");
-                    } catch (Exception ex) {
-                        System.err.println("Error during save: " + ex.getMessage());
-                        ex.printStackTrace();
-                    }
-                    
-                    // Force refresh UI on JavaFX thread
-                    Platform.runLater(() -> {
-                        // Clear content area first
-                        contentArea.getChildren().clear();
-                        
-                        // Then rebuild the health data view with refreshed data
-                        VBox vitalsView = new VBox(15);
-                        vitalsView.setPadding(new Insets(20));
-                        vitalsView.setAlignment(Pos.TOP_CENTER);
-                        
-                        Label headerLabel = new Label("My Health Data");
-                        headerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
-                        
-                        // Get fresh vitals data
-                        ArrayList<VitalSign> refreshedVitals = vitalsDB.getVitals();
-                        System.out.println("Display refreshed vitals: " + refreshedVitals.size());
-                        
-                        // Create table and populate it
-                        TableView<VitalSign> vitalsTable = createVitalsTable(refreshedVitals);
-                        
-                        Button addVitalButton = new Button("Add New Vital Signs");
-                        addVitalButton.setOnAction(e -> {
-                            // Your existing code for adding vitals
-                            Dialog<VitalSign> dialog = new Dialog<>();
-                            dialog.setTitle("Add Vital Signs");
-                            // ... existing code ...
-                        });
-                        
-                        Button uploadCSVButton = new Button("Upload Vitals from CSV");
-                        uploadCSVButton.setOnAction(evt -> handleUploadVitalsFromCSV());
-                        
-                        HBox buttonBox = new HBox(10);
-                        buttonBox.setAlignment(Pos.CENTER);
-                        buttonBox.getChildren().addAll(addVitalButton, uploadCSVButton);
-                        
-                        vitalsView.getChildren().addAll(headerLabel, vitalsTable, buttonBox);
-                        contentArea.getChildren().add(vitalsView);
-                    });
-                    
-                    showAlert(Alert.AlertType.INFORMATION, "Upload Successful", 
-                             "Successfully imported " + importedVitals.size() + " vital records.");
+                    // Refresh the display
+                    handleViewHealthData(null);
                 } else {
                     showAlert(Alert.AlertType.WARNING, "Empty Data", 
                              "No valid vital signs data found in the selected CSV file.");
@@ -745,78 +707,164 @@ public class PatientDashboardController {
             doctorComboBox.setValue(doctorsData.get(0));
         }
         
-        // Chat display area
+        // Chat display area with improved styling
         TextArea chatHistoryArea = new TextArea();
         chatHistoryArea.setEditable(false);
         chatHistoryArea.setPrefHeight(300);
         chatHistoryArea.setWrapText(true);
+        chatHistoryArea.setStyle("-fx-font-family: 'Segoe UI', Arial, sans-serif;");
+        
+        // Create chat client for the current patient
+        ChatClient chatClient = new ChatClient(currentPatient);
+        
+        // Setup real-time message listener
+        chatClient.addMessageListener(new ChatMessageListener() {
+            @Override
+            public void onNewMessage(ChatMessage message) {
+                // Check if message is related to the currently selected doctor
+                Doctor selectedDoctor = doctorComboBox.getValue();
+                if (selectedDoctor != null && 
+                    (message.getSenderId() == selectedDoctor.getUserID() || 
+                     message.getReceiverId() == selectedDoctor.getUserID())) {
+                    
+                    // Update UI on JavaFX thread
+                    Platform.runLater(() -> {
+                        updateChatDisplay(chatHistoryArea, selectedDoctor, chatClient);
+                    });
+                }
+            }
+        });
         
         // Message input area
         TextField messageField = new TextField();
         messageField.setPromptText("Type your message here...");
         
         Button sendButton = new Button("Send");
-        sendButton.setOnAction(e -> {
+        sendButton.setStyle("-fx-background-color: #0078d7; -fx-text-fill: white;");
+        sendButton.setDefaultButton(true);
+        
+        HBox messageBox = new HBox(10);
+        messageBox.setAlignment(Pos.CENTER);
+        HBox.setHgrow(messageField, Priority.ALWAYS);
+        messageBox.getChildren().addAll(messageField, sendButton);
+        
+        // Update chat when doctor selection changes
+        doctorComboBox.setOnAction(e -> {
             Doctor selectedDoctor = doctorComboBox.getValue();
+            if (selectedDoctor != null) {
+                updateChatDisplay(chatHistoryArea, selectedDoctor, chatClient);
+                
+                // Mark messages as read
+                chatClient.markMessagesAsRead(selectedDoctor.getUserID());
+            }
+        });
+        
+        // Load initial chat history
+        if (!doctorsData.isEmpty()) {
+            updateChatDisplay(chatHistoryArea, doctorsData.get(0), chatClient);
+        }
+        
+        // Send message action
+        sendButton.setOnAction(e -> {
             String message = messageField.getText().trim();
+            Doctor selectedDoctor = doctorComboBox.getValue();
             
-            if (selectedDoctor != null && !message.isEmpty()) {
+            if (!message.isEmpty() && selectedDoctor != null) {
                 // Send the message
-                ChatClient chatClient = new ChatClient(currentPatient, SessionManager.getChatServer());
-                chatClient.sendMessage(selectedDoctor.getName(), message);
+                chatClient.sendMessage(selectedDoctor.getUserID(), message);
                 
-                // Refresh chat history
-                String chatHistory = String.join("\n", 
-                    SessionManager.getChatServer().getChatHistory(
-                        currentPatient.getName(), selectedDoctor.getName()));
-                
-                chatHistoryArea.setText(chatHistory);
+                // Update chat display
+                updateChatDisplay(chatHistoryArea, selectedDoctor, chatClient);
                 
                 // Clear message field
                 messageField.clear();
+                messageField.requestFocus();
             }
         });
         
-        // View history button
-        Button viewHistoryButton = new Button("View Chat History");
-        viewHistoryButton.setOnAction(e -> {
-            Doctor selectedDoctor = doctorComboBox.getValue();
+        // Notification badge for unread messages
+        HBox notificationBox = new HBox(10);
+        notificationBox.setAlignment(Pos.CENTER);
+        
+        Button checkUnreadButton = new Button("Check Unread Messages");
+        checkUnreadButton.setOnAction(e -> {
+            StringBuilder unreadSummary = new StringBuilder("Unread messages:\n");
+            boolean hasUnread = false;
             
-            if (selectedDoctor != null) {
-                String chatHistory = String.join("\n", 
-                    SessionManager.getChatServer().getChatHistory(
-                        currentPatient.getName(), selectedDoctor.getName()));
-                
-                if (chatHistory.isEmpty()) {
-                    chatHistoryArea.setText("No chat history with this doctor yet.");
-                } else {
-                    chatHistoryArea.setText(chatHistory);
+            for (Doctor doctor : doctors) {
+                List<ChatMessage> unreadMessages = chatClient.getUnreadMessages(doctor.getUserID());
+                if (!unreadMessages.isEmpty()) {
+                    hasUnread = true;
+                    unreadSummary.append(doctor.getName())
+                                .append(": ")
+                                .append(unreadMessages.size())
+                                .append(" unread message(s)\n");
                 }
             }
+            
+            if (!hasUnread) {
+                unreadSummary.append("No unread messages");
+            }
+            
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Unread Messages");
+            alert.setHeaderText(null);
+            alert.setContentText(unreadSummary.toString());
+            alert.showAndWait();
         });
         
-        // Layout
-        HBox doctorSelectionBox = new HBox(10, new Label("Select Doctor:"), doctorComboBox);
-        doctorSelectionBox.setAlignment(Pos.CENTER_LEFT);
-        
-        HBox messageBox = new HBox(10, messageField, sendButton);
-        messageBox.setAlignment(Pos.CENTER);
-        HBox.setHgrow(messageField, Priority.ALWAYS);
-        
-        HBox buttonBox = new HBox(10, viewHistoryButton);
-        buttonBox.setAlignment(Pos.CENTER);
+        notificationBox.getChildren().add(checkUnreadButton);
         
         chatView.getChildren().addAll(
             headerLabel, 
-            doctorSelectionBox, 
+            new HBox(10, new Label("Select Doctor:"), doctorComboBox), 
             new Label("Chat History:"),
             chatHistoryArea, 
             new Label("Message:"),
             messageBox,
-            buttonBox
+            notificationBox
         );
         
         contentArea.getChildren().add(chatView);
+    }
+    
+    /**
+     * Helper method to update the chat display
+     */
+    private void updateChatDisplay(TextArea chatArea, Doctor doctor, ChatClient chatClient) {
+        // Get chat history
+        List<ChatMessage> history = chatClient.getChatHistory(doctor.getUserID());
+        
+        // Clear current display
+        chatArea.clear();
+        
+        if (history.isEmpty()) {
+            chatArea.setText("No messages yet. Start the conversation!");
+            return;
+        }
+        
+        // Format and display messages
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        
+        for (ChatMessage message : history) {
+            String sender;
+            
+            if (message.getSenderId() == currentPatient.getUserID()) {
+                sender = "Me";
+            } else {
+                sender = doctor.getName();
+            }
+            
+            String formattedMessage = String.format("[%s] %s: %s\n", 
+                    timeFormat.format(message.getTimestamp()),
+                    sender,
+                    message.getContent());
+            
+            chatArea.appendText(formattedMessage);
+        }
+        
+        // Scroll to bottom
+        chatArea.positionCaret(chatArea.getText().length());
     }
     
     @FXML
@@ -1465,5 +1513,211 @@ public class PatientDashboardController {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+    
+    @FXML
+    private void handleProvideFeedback(ActionEvent event) {
+        contentArea.getChildren().clear();
+        
+        VBox feedbackView = new VBox(15);
+        feedbackView.setPadding(new Insets(20));
+        feedbackView.setAlignment(Pos.TOP_CENTER);
+        
+        Label headerLabel = new Label("Provide Feedback to Doctor");
+        headerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        
+        // Get all doctors
+        ArrayList<Doctor> doctors = SessionManager.getDoctors();
+        
+        // Doctor selection
+        Label doctorLabel = new Label("Select Doctor:");
+        doctorLabel.setStyle("-fx-font-weight: bold;");
+        
+        ComboBox<Doctor> doctorComboBox = new ComboBox<>();
+        
+        // Create custom cell factory to display doctor names
+        doctorComboBox.setCellFactory(param -> new ListCell<Doctor>() {
+            @Override
+            protected void updateItem(Doctor item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText("Dr. " + item.getName() + " (" + item.getSpecialization() + ")");
+                }
+            }
+        });
+        
+        // Set the button cell to also display the doctor name
+        doctorComboBox.setButtonCell(new ListCell<Doctor>() {
+            @Override
+            protected void updateItem(Doctor item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText("Dr. " + item.getName() + " (" + item.getSpecialization() + ")");
+                }
+            }
+        });
+        
+        // Add doctors to combo box
+        ObservableList<Doctor> doctorsData = FXCollections.observableArrayList(doctors);
+        doctorComboBox.setItems(doctorsData);
+        
+        if (!doctorsData.isEmpty()) {
+            doctorComboBox.setValue(doctorsData.get(0));
+        }
+        
+        // Comments area
+        Label commentsLabel = new Label("Your Feedback:");
+        commentsLabel.setStyle("-fx-font-weight: bold;");
+        
+        TextArea commentsArea = new TextArea();
+        commentsArea.setPrefHeight(150);
+        commentsArea.setPromptText("Please provide your feedback about the doctor, consultation, treatment, etc.");
+        commentsArea.setWrapText(true);
+        
+        // Rating section
+        Label ratingLabel = new Label("Rating (1-5 stars):");
+        ratingLabel.setStyle("-fx-font-weight: bold;");
+        
+        HBox ratingBox = new HBox(10);
+        ratingBox.setAlignment(Pos.CENTER_LEFT);
+        
+        ToggleGroup ratingGroup = new ToggleGroup();
+        for (int i = 1; i <= 5; i++) {
+            RadioButton rb = new RadioButton(i + " ★");
+            rb.setUserData(i);
+            rb.setToggleGroup(ratingGroup);
+            if (i == 5) rb.setSelected(true); // Default to 5 stars
+            ratingBox.getChildren().add(rb);
+        }
+        
+        // Submit button
+        Button submitButton = new Button("Submit Feedback");
+        submitButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        submitButton.setOnAction(e -> {
+            Doctor selectedDoctor = doctorComboBox.getValue();
+            String comments = commentsArea.getText().trim();
+            
+            // Validate input
+            if (selectedDoctor == null) {
+                showAlert(Alert.AlertType.WARNING, "Missing Selection", "Please select a doctor.");
+                return;
+            }
+            
+            if (comments.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Missing Information", "Please provide your feedback comments.");
+                return;
+            }
+            
+            // Get selected rating
+            int rating = 5; // Default
+            if (ratingGroup.getSelectedToggle() != null) {
+                rating = (int) ratingGroup.getSelectedToggle().getUserData();
+            }
+            
+            // Prepend rating to comments
+            String ratedComments = rating + "★ - " + comments;
+            
+            // Create feedback object (without prescription since it's from patient)
+            Feedback feedback = new Feedback(selectedDoctor, currentPatient, ratedComments, null);
+            
+            // Save feedback
+            if (currentPatient.getMedicalHistory() == null) {
+                currentPatient.setMedicalHistory(new MedicalHistory());
+            }
+            
+            currentPatient.getMedicalHistory().addFeedback(feedback);
+            
+            // Also add to doctor's feedback received list if available
+            if (selectedDoctor.getFeedbackReceived() != null) {
+                Map<String, Object> feedbackMap = new HashMap<>();
+                feedbackMap.put("patient", currentPatient.getName());
+                feedbackMap.put("rating", rating);
+                feedbackMap.put("comments", comments);
+                feedbackMap.put("date", new Date());
+                selectedDoctor.getFeedbackReceived().add(feedbackMap);
+            }
+            
+            // Save updates
+            SessionManager.saveData();
+            
+            showAlert(Alert.AlertType.INFORMATION, "Feedback Submitted", 
+                     "Your feedback has been submitted successfully. Thank you!");
+            
+            // Clear form
+            commentsArea.clear();
+        });
+        
+        // View past feedback section
+        TitledPane pastFeedbackPane = new TitledPane();
+        pastFeedbackPane.setText("View Your Past Feedback");
+        
+        VBox pastFeedbackContent = new VBox(10);
+        pastFeedbackContent.setPadding(new Insets(10));
+        
+        if (currentPatient.getMedicalHistory() != null) {
+            ArrayList<Feedback> feedbackList = currentPatient.getMedicalHistory().getPastConsultations();
+            
+            if (feedbackList.isEmpty()) {
+                pastFeedbackContent.getChildren().add(new Label("You haven't provided any feedback yet."));
+            } else {
+                ListView<Feedback> feedbackListView = new ListView<>();
+                feedbackListView.setPrefHeight(200);
+                
+                // Create cell factory
+                feedbackListView.setCellFactory(param -> new ListCell<Feedback>() {
+                    @Override
+                    protected void updateItem(Feedback item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (empty || item == null) {
+                            setText(null);
+                            setGraphic(null);
+                        } else {
+                            VBox cellContent = new VBox(5);
+                            
+                            Label doctorLabel = new Label("To: Dr. " + item.getDoctor().getName());
+                            doctorLabel.setStyle("-fx-font-weight: bold;");
+                            
+                            Label dateLabel = new Label("Date: " + new SimpleDateFormat("yyyy-MM-dd HH:mm").format(item.getConsultationDate()));
+                            dateLabel.setStyle("-fx-font-style: italic;");
+                            
+                            Label commentsLabel = new Label(item.getComments());
+                            commentsLabel.setWrapText(true);
+                            
+                            cellContent.getChildren().addAll(doctorLabel, dateLabel, commentsLabel);
+                            
+                            setGraphic(cellContent);
+                        }
+                    }
+                });
+                
+                // Add data
+                feedbackListView.setItems(FXCollections.observableArrayList(feedbackList));
+                pastFeedbackContent.getChildren().add(feedbackListView);
+            }
+        } else {
+            pastFeedbackContent.getChildren().add(new Label("You haven't provided any feedback yet."));
+        }
+        
+        pastFeedbackPane.setContent(pastFeedbackContent);
+        
+        // Assemble the view
+        feedbackView.getChildren().addAll(
+            headerLabel,
+            doctorLabel,
+            doctorComboBox,
+            commentsLabel,
+            commentsArea,
+            ratingLabel,
+            ratingBox,
+            submitButton,
+            new Separator(),
+            pastFeedbackPane
+        );
+        
+        contentArea.getChildren().add(feedbackView);
     }
 }

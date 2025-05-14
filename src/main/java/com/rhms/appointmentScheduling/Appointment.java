@@ -1,11 +1,14 @@
 package com.rhms.appointmentScheduling;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.rhms.userManagement.Doctor;
 import com.rhms.userManagement.Patient;
 
-public class Appointment {
+public class Appointment implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     private Date appointmentDate;
     private Doctor doctor;
     private Patient patient;
@@ -48,6 +51,11 @@ public class Appointment {
         this.status = status;
         this.notes = notes;
         this.appointmentID = appointmentID;
+        
+        // Update the next ID if this ID is higher than the current next ID
+        if (appointmentID >= nextAppointmentID) {
+            nextAppointmentID = appointmentID + 1;
+        }
     }
     
     // Getter for appointment date
@@ -65,7 +73,10 @@ public class Appointment {
         return doctor;
     }
     
-    // Setter for doctor
+    /**
+     * Setter for doctor
+     * @param doctor The new doctor
+     */
     public void setDoctor(Doctor doctor) {
         this.doctor = doctor;
     }
@@ -75,7 +86,10 @@ public class Appointment {
         return patient;
     }
     
-    // Setter for patient
+    /**
+     * Setter for patient
+     * @param patient The new patient
+     */
     public void setPatient(Patient patient) {
         this.patient = patient;
     }

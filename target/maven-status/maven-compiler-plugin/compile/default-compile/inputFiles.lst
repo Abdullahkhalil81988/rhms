@@ -8,6 +8,7 @@ D:\rhms\src\main\java\com\rhms\doctorPatientInteraction\VideoCall.java
 D:\rhms\src\main\java\com\rhms\notifications\SMSNotification.java
 D:\rhms\src\main\java\com\rhms\analytics\HealthAnalytics.java
 D:\rhms\src\main\java\com\rhms\emergencyAlert\PanicButton.java
+D:\rhms\src\main\java\com\rhms\doctorPatientInteraction\ChatMessage.java
 D:\rhms\src\main\java\com\rhms\userManagement\UserIDManager.java
 D:\rhms\src\main\java\com\rhms\analytics\ChartGenerator.java
 D:\rhms\src\main\java\com\rhms\appointmentScheduling\Appointment.java
@@ -19,6 +20,7 @@ D:\rhms\src\main\java\com\rhms\gui\controllers\PatientDashboardController.java
 D:\rhms\src\main\java\com\rhms\gui\controllers\LoginController.java
 D:\rhms\src\main\java\com\rhms\healthDataHandling\CSVVitalsProcessor.java
 D:\rhms\src\main\java\com\rhms\doctorPatientInteraction\ChatServer.java
+D:\rhms\src\main\java\com\rhms\doctorPatientInteraction\ChatMessageListener.java
 D:\rhms\src\main\java\com\rhms\persistence\DataPersistenceManager.java
 D:\rhms\src\main\java\com\rhms\healthDataHandling\VitalSign.java
 D:\rhms\src\main\java\com\rhms\appointmentScheduling\AppointmentManager.java

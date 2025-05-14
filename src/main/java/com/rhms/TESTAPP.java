@@ -1,6 +1,7 @@
 package com.rhms;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 import com.rhms.analytics.AnalyticsResult;
@@ -37,7 +38,7 @@ public class TESTAPP {
     private static String userType = ""; // Store user type
     private static User currentUser = null; // Track logged in user
     private static boolean isLoggedIn = false; // Track login status
-    private static ChatServer chatServer = new ChatServer();
+    private static ChatServer chatServer = ChatServer.getInstance();
     private static SMSNotification smsNotification = new SMSNotification();
     // Add this with other field declarations
     private static EmailNotification emailNotification = new EmailNotification();
@@ -934,7 +935,38 @@ public class TESTAPP {
         System.out.println("\n=== Chat Interface ===");
         
         // Create chat client
-        ChatClient chatClient = new ChatClient(currentUser, chatServer);
+        ChatClient chatClient = new ChatClient(currentUser);
+        
+        // Create a chat listener for real-time messages
+        chatClient.addMessageListener(new ChatMessageListener() {
+            @Override
+            public void onNewMessage(ChatMessage message) {
+                if (message.getSenderId() == currentUser.getUserID()) {
+                    System.out.println("You: " + message.getContent());
+                } else {
+                    String senderName = "Unknown";
+                    // Find sender name
+                    if ("Patient".equals(userType)) {
+                        for (Doctor doc : doctors) {
+                            if (doc.getUserID() == message.getSenderId()) {
+                                senderName = "Dr. " + doc.getName();
+                                break;
+                            }
+                        }
+                    } else {
+                        for (Patient pat : patients) {
+                            if (pat.getUserID() == message.getSenderId()) {
+                                senderName = pat.getName();
+                                break;
+                            }
+                        }
+                    }
+                    System.out.println(senderName + ": " + message.getContent());
+                }
+            }
+        });
+        
+        User selectedUser = null;
         
         // Show users to chat with
         if ("Patient".equals(userType)) {
@@ -942,41 +974,97 @@ public class TESTAPP {
             for (int i = 0; i < doctors.size(); i++) {
                 System.out.println((i + 1) + ". Dr. " + doctors.get(i).getName());
             }
+            
+            System.out.print("Select doctor to chat with (enter number, or 0 to exit): ");
+            int selection = safeNextInt(null);
+            
+            if (selection == 0) {
+                return;
+            }
+            
+            if (selection < 1 || selection > doctors.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            selectedUser = doctors.get(selection - 1);
         } else if ("Doctor".equals(userType)) {
             System.out.println("Available patients to chat with:");
             for (int i = 0; i < patients.size(); i++) {
                 System.out.println((i + 1) + ". " + patients.get(i).getName());
             }
-        }
-        
-        System.out.print("Select user to chat with (enter number, or 0 to exit): ");
-        int selection = safeNextInt(null);
-        
-        if (selection == 0) {
-            return;
-        }
-        
-        String recipient;
-        if ("Patient".equals(userType) && selection > 0 && selection <= doctors.size()) {
-            recipient = doctors.get(selection - 1).getName();
-        } else if ("Doctor".equals(userType) && selection > 0 && selection <= patients.size()) {
-            recipient = patients.get(selection - 1).getName();
+            
+            System.out.print("Select patient to chat with (enter number, or 0 to exit): ");
+            int selection = safeNextInt(null);
+            
+            if (selection == 0) {
+                return;
+            }
+            
+            if (selection < 1 || selection > patients.size()) {
+                System.out.println("Invalid selection.");
+                return;
+            }
+            
+            selectedUser = patients.get(selection - 1);
         } else {
-            System.out.println("Invalid selection.");
+            System.out.println("Chat is only available for doctors and patients.");
             return;
         }
+        
+        if (selectedUser == null) {
+            System.out.println("No user selected for chat.");
+            return;
+        }
+        
+        int recipientId = selectedUser.getUserID();
+        
+        // Mark existing messages as read
+        chatClient.markMessagesAsRead(recipientId);
         
         // Show chat history
-        chatClient.displayChat(recipient);
+        List<ChatMessage> history = chatClient.getChatHistory(recipientId);
+        System.out.println("\n=== Chat with " + selectedUser.getName() + " ===");
         
-        // Send a message
-        System.out.print("Enter your message (or 'exit' to return): ");
-        String message = scanner.nextLine().trim();
-        
-        if (!message.equalsIgnoreCase("exit")) {
-            chatClient.sendMessage(recipient, message);
-            System.out.println("Message sent!");
+        if (history.isEmpty()) {
+            System.out.println("No previous messages. Start a conversation!");
+        } else {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            for (ChatMessage message : history) {
+                String sender;
+                if (message.getSenderId() == currentUser.getUserID()) {
+                    sender = "You";
+                } else {
+                    sender = selectedUser.getName();
+                }
+                System.out.println("[" + dateFormat.format(message.getTimestamp()) + "] " + 
+                                  sender + ": " + message.getContent());
+            }
         }
+        
+        // Chat loop
+        boolean chatting = true;
+        while (chatting) {
+            System.out.print("\nEnter message (or type 'exit' to return): ");
+            String message = scanner.nextLine().trim();
+            
+            if (message.equalsIgnoreCase("exit")) {
+                chatting = false;
+            } else if (!message.isEmpty()) {
+                chatClient.sendMessage(recipientId, message);
+                
+                // Check for any new messages from the other user
+                List<ChatMessage> newMessages = chatClient.getUnreadMessages(recipientId);
+                for (ChatMessage newMsg : newMessages) {
+                    if (newMsg.getSenderId() == recipientId) {
+                        System.out.println("[NEW] " + selectedUser.getName() + ": " + newMsg.getContent());
+                        chatClient.markMessagesAsRead(recipientId);
+                    }
+                }
+            }
+        }
+        
+        System.out.println("Exiting chat...");
     }
     
     // Provide feedback to doctor

@@ -30,6 +30,7 @@
             <Button text="Prescriptions" maxWidth="Infinity" onAction="#handlePrescriptions"/>
             <Button text="Chat with Patients" maxWidth="Infinity" onAction="#handleChatWithPatients"/>
             <Button text="Health Analytics" maxWidth="Infinity" onAction="#handleHealthAnalytics"/>
+            <Button text="View Patient Feedback" maxWidth="Infinity" onAction="#handleViewFeedback"/>
         </VBox>
     </left>
     

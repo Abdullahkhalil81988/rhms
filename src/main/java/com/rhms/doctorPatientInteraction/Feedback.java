@@ -31,11 +31,25 @@ public class Feedback implements Serializable {
     }
     
     /**
+     * Update the doctor reference
+     */
+    public void setDoctor(Doctor doctor) {
+        this.doctor = doctor;
+    }
+    
+    /**
      * Get the patient who received the feedback
      * @return The patient
      */
     public Patient getPatient() {
         return patient;
+    }
+    
+    /**
+     * Update the patient reference
+     */
+    public void setPatient(Patient patient) {
+        this.patient = patient;
     }
     
     /**

@@ -21,6 +21,8 @@ public class VitalsDatabase implements Serializable {
     private ArrayList<VitalSign> vitals;
     // Timestamp for the last update
     private Date lastUpdated;
+    // Flag to indicate if the database has unsaved changes
+    private boolean isDirty;
     
     /**
      * Creates a new vitals database for a specific patient
@@ -31,6 +33,7 @@ public class VitalsDatabase implements Serializable {
         this.patientId = patient.getUserID(); // Store the ID separately
         this.vitals = new ArrayList<>();
         this.lastUpdated = null;
+        this.isDirty = false;
     }
     
     /**
@@ -43,7 +46,8 @@ public class VitalsDatabase implements Serializable {
         }
         
         vitals.add(vitalSign);
-        lastUpdated = new Date(); // Update timestamp
+        lastUpdated = new Date();
+        isDirty = true;
         
         System.out.println("Added vital to database: " + 
                           vitalSign.getHeartRate() + ", " + 
@@ -112,5 +116,21 @@ public class VitalsDatabase implements Serializable {
     private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
         // Patient reference will be restored by Patient.readObject
+    }
+    
+    /**
+     * Gets the patient ID associated with this vitals database
+     * @return Patient ID
+     */
+    public int getPatientId() {
+        return patientId;
+    }
+    
+    /**
+     * Gets the last updated timestamp
+     * @return Date of last update
+     */
+    public Date getLastUpdated() {
+        return lastUpdated;
     }
 }
